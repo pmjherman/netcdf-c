@@ -12,6 +12,7 @@
 #include <string.h>
 #include <netcdf.h>
 
+
 #define CHECK_ERR { \
     if (err != NC_NOERR) { \
         nerrs++; \

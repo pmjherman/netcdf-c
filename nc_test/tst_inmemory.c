@@ -371,6 +371,7 @@ verify_file(int ncid, int modified)
 
     /* Get all the dimids */
     tmp = 0;
+#ifdef USE_NETCDF4
     CHECK((nc_inq_dimids(ncid,&tmp,dimid,1)));
     if(tmp != NDIMS) CHECK(NC_EINVAL);
 
@@ -378,6 +379,16 @@ verify_file(int ncid, int modified)
     tmp = 0;
     CHECK((nc_inq_varids(ncid,&tmp,varid)));
     if(tmp != (NVARS+modified)) CHECK(NC_EINVAL);
+#else
+    { /* Simulate nc_inq_varids and nc_inq_dimids */
+	int j;
+	int dimcnt = 0;
+        int varcnt = 0;
+	CHECK(nc_inq(ncid, &dimcnt, &varcnt, NULL, NULL);
+	for(j=0;j<dimcnt;j++) dimid[j] = j;	
+	for(j=0;j<varcnt;j++) varid[j] = j;	
+    }
+#endif
 
     CHECK(nc_get_att_text(ncid, NC_GLOBAL, ATT0_NAME, att0_in));
     att0_in[sizeof(ATT0_TEXT)] = '\0';

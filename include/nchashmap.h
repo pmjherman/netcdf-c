@@ -94,6 +94,13 @@ extern size_t NC_hashmapcount(NC_hashmap*);
 /** Reclaims the hashmap structure. */
 extern int NC_hashmapfree(NC_hashmap*);
 
+/* Hacks to access internal state: Use with care */
+
+/* Convert an entry from ACTIVE to DELETED;
+   Return 0 if not found.
+*/
+extern int NC_hashmapdeactivate(NC_hashmap*, uintptr_t data);
+
 /* Return the hash key for specified key; takes key+size*/
 extern unsigned int NC_hashmapkey(void* key, size_t size);
 

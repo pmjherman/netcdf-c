@@ -601,7 +601,7 @@ NC4_inq_compound_field(int ncid, nc_type typeid1, int fieldid, char *name,
    /* Find the field. */
    for(i=0;i<nclistlength(type->u.c.fields);i++) {
       field = nclistget(type->u.c.fields,i);
-      if (field->fieldid == fieldid)
+      if (field->hdr.id == fieldid)
       {
 	 if (name)
 	    strcpy(name, field->hdr.name);
@@ -701,7 +701,7 @@ NC4_inq_compound_fieldindex(int ncid, nc_type typeid1, const char *name, int *fi
       return NC_EBADFIELD;
 
    if (fieldidp)
-      *fieldidp = field->fieldid;
+      *fieldidp = field->hdr.id;
    return NC_NOERR;
 }
 

@@ -48,6 +48,10 @@ extern struct NC_OBJ** NC_listmap_dup(NC_listmap* listmap);
 /* Return 1 if ok, 0 otherwise.*/
 extern int NC_listmap_rehash(NC_listmap* listmap);
 
+/* Remove ith object from the listmap; WARNING: may affect ids */
+/* Return 1 if ok, 0 otherwise.*/
+extern int NC_listmap_idel(NC_listmap* listmap,size_t index);
+
 /* Reset a list map without free'ing the map itself */
 /* Return 1 if ok; 0 otherwise */
 extern int NC_listmap_clear(NC_listmap* listmap);

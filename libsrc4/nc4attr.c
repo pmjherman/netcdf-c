@@ -279,6 +279,7 @@ exit:
 /**
  * @internal Learn about an att. All the nc4 nc_inq_ functions just
  * call nc4_get_att to get the metadata on an attribute.
+ * Note: do not attempt to call for reserved global attributes
  *
  * @param ncid File and group ID.
  * @param varid Variable ID.
@@ -656,8 +657,10 @@ NC4_put_att(int ncid, int varid, const char *name, nc_type file_type,
    if ((retval = nc4_check_name(name, norm_name)))
       return retval;
 
-   /* Check that a reserved NC_GLOBAL att name is not being used. */
-   if (nc->ext_ncid == ncid && varid == NC_GLOBAL) {
+   /* Check that a reserved att name is not being used improperly:
+      where improper => grp=root, varid==NC_GLOBAL, flags&NAMEONLYFLAG
+   */
+   if (nc->ext_ncid == ncid && varid == NC_GLOBAL && grp->parent == NULL) {
       const NC_reservedatt* ra = NC_findreserved(name);
       if(ra != NULL && (ra->flags & NAMEONLYFLAG))
 	    return NC_ENAMEINUSE;

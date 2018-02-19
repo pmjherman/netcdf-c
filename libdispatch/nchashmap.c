@@ -23,7 +23,7 @@ See LICENSE.txt for license information.
 /* Prototype for the crc32 function */
 extern unsigned int NC_crc32(unsigned int crc, const unsigned char* buf, unsigned int len);
 
-#define SMALLTABLE
+#undef SMALLTABLE
 
 #ifdef ASSERTIONS
 #define ASSERT(x) assert(x)
@@ -71,7 +71,9 @@ static void
 rehash(NC_hashmap* hm)
 {
     size_t alloc = hm->alloc;
+#ifdef ASSERTIONS
     size_t active = hm->active;
+#endif
     NC_hentry* oldtable = hm->table;
 
     TRACE("rehash");
@@ -200,6 +202,7 @@ NC_hashmapadd(NC_hashmap* hash, uintptr_t data, void* key, size_t keysize)
 	    entry->hashkey = hashkey;
 	    entry->keysize = keysize;
 	    if(keysize <= sizeof(uintptr_t)) {/* store a copy */
+		entry->key = 0;
 		memcpy((void*)&entry->key,key,keysize);
 	    } else {
 		entry->key = (uintptr_t)key;
@@ -308,6 +311,24 @@ NC_hashmapfree(NC_hashmap* hash)
     }
     return 1;
 }
+
+int
+NC_hashmapdeactivate(NC_hashmap* map, uintptr_t data)
+{
+    size_t i;        
+    NC_hentry* h;
+    for(h=map->table,i=0;i<map->alloc;i++,h++) {
+	if((h->flags & ACTIVE) && h->data == data) {
+	    h->flags = DELETED;
+ 	    h->key = (uintptr_t)NULL;
+	    h->keysize = 0;
+	    --map->active;
+	    return 1;
+	}
+    }
+    return 0;
+}
+
 
 /**************************************************/
 /* Prime table */
@@ -2031,10 +2052,15 @@ next:	continue;
 static const char*
 keystr(NC_hentry* e)
 {
-    if(e->keysize < sizeof(uintptr_t))
-	return (const char*)(&e->key);
-    else 
-	return (const char*)(e->key);
+    static char s[sizeof(uintptr_t)+1];
+    size_t x = sizeof(uintptr_t);
+    if(e == NULL) return "<NULL>";
+    if(e->keysize <= x) {
+	memset(s,0,sizeof(s));
+	memcpy(s,(const char*)(&e->key),e->keysize);
+	return s;
+    } else 
+	return (e->key?(const char*)(e->key):"<NULL>");
 }
 
 void

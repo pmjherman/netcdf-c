@@ -1723,17 +1723,27 @@ do_ncdump_rec(int ncid, const char *path)
 	  * ambiguous. */
 	 {
 	     int dimid_test;	/* to see if dimname is ambiguous */
+	     int target_dimid;  /* from variable dim list */
 	     int locid;		/* group id where dimension is defined */
+	     /*Locate the innermost definition of a dimension with given name*/
 	     NC_CHECK( nc_inq_dimid(ncid, dim_name, &dimid_test) );
+
+	     /* Now, starting with current group, walk the parent chain
+                upward looking for the target dim_id */
+	     target_dimid = var.dims[id];
 	     locid = ncid;
-	     while(var.dims[id] != dimid_test) { /* not in locid, try ancestors */
+	     while(target_dimid != dimid_test) {/*not in locid, try ancestors*/
 		 int parent_id;
 		 NC_CHECK( nc_inq_grp_parent(locid, &parent_id) );
 		 locid = parent_id;
+		 /* Is dim of this name defined in this group or higher? */
 		 NC_CHECK( nc_inq_dimid(locid, dim_name, &dimid_test) );
 	     }
-	     /* dimid is in group locid, prefix dimname with group name if needed */
-	     if(locid != ncid) {
+	     /* innermost dimid with given name is in group locid.
+                If this is not current group, then use fully qualified
+                name (fqn) for the dimension name by prefixing dimname
+                with group name */
+	     if(locid != ncid) { /* We need to use fqn */
 		 size_t len;
 		 char *locname;	/* the group name */
 		 NC_CHECK( nc_inq_grpname_full(locid, &len, NULL) );

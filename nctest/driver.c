@@ -112,6 +112,9 @@ main(int argc, char **argv)
       nerrs += test_ncattcopy(testfile, "test2.nc");
       nerrs += test_ncattname(testfile);
       nerrs += test_ncattrename(testfile);
+if(strcmp(testfile,"nctest_netcdf4_classic.nc")==0) {
+int x = 0;
+}
       nerrs += test_ncattdel(testfile);
       nerrs += test_nctypelen();
 

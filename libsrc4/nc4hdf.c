@@ -104,8 +104,8 @@ rec_reattach_scales(NC_GRP_INFO_T *grp, int dimid, hid_t dimscaleid)
    int retval;
    int i,n;
 
-   assert(grp && grp->name && dimid >= 0 && dimscaleid >= 0);
-   LOG((3, "%s: grp->name %s", __func__, grp->name));
+   assert(grp && grp->hdr.name && dimid >= 0 && dimscaleid >= 0);
+   LOG((3, "%s: grp->name %s", __func__, grp->hdr.name));
 
    /* If there are any child groups, attach dimscale there, if needed. */
    n = NC_listmap_size(&grp->children);
@@ -159,8 +159,8 @@ rec_detach_scales(NC_GRP_INFO_T *grp, int dimid, hid_t dimscaleid)
    int retval;
    int i,n;
 
-   assert(grp && grp->name && dimid >= 0 && dimscaleid >= 0);
-   LOG((3, "%s: grp->name %s", __func__, grp->name));
+   assert(grp && grp->hdr.name && dimid >= 0 && dimscaleid >= 0);
+   LOG((3, "%s: grp->hdr.name %s", __func__, grp->hdr.name));
 
    /* If there are any child groups, detach dimscale there, if needed. */
    n = NC_listmap_size(&grp->children);
@@ -2007,7 +2007,7 @@ commit_type(NC_GRP_INFO_T *grp, NC_TYPE_INFO_T *type)
       for(i=0;i<nclistlength(type->u.c.fields);i++)
       {
 	 field = (NC_FIELD_INFO_T*)nclistget(type->u.c.fields,i);
-         if ((retval = nc4_get_hdf_typeid(grp->nc4_info, field->hdr.id,
+         if ((retval = nc4_get_hdf_typeid(grp->nc4_info, field->nc_typeid,
                                           &hdf_base_typeid, type->endianness)))
             return retval;
 
@@ -2031,9 +2031,9 @@ commit_type(NC_GRP_INFO_T *grp, NC_TYPE_INFO_T *type)
          }
          else
             hdf_typeid = hdf_base_typeid;
-         LOG((4, "inserting field %s offset %d hdf_typeid 0x%x", field->name,
+         LOG((4, "inserting field %s offset %d hdf_typeid 0x%x", field->hdr.name,
               field->offset, hdf_typeid));
-         if (H5Tinsert(type->hdf_typeid, field->name, field->offset,
+         if (H5Tinsert(type->hdf_typeid, field->hdr.name, field->offset,
                        hdf_typeid) < 0)
             return NC_EHDFERR;
          if (H5Tclose(hdf_typeid) < 0)
@@ -2178,7 +2178,7 @@ create_group(NC_GRP_INFO_T *grp)
          BAIL(NC_EHDFERR);
       if (H5Pset_attr_creation_order(gcpl_id, H5P_CRT_ORDER_TRACKED|H5P_CRT_ORDER_INDEXED) < 0)
          BAIL(NC_EHDFERR);
-      if ((grp->hdf_grpid = H5Gcreate2(grp->parent->hdf_grpid, grp->name,
+      if ((grp->hdf_grpid = H5Gcreate2(grp->parent->hdf_grpid, grp->hdr.name,
                                        H5P_DEFAULT, gcpl_id, H5P_DEFAULT)) < 0)
          BAIL(NC_EHDFERR);
       if (H5Pclose(gcpl_id) < 0)
@@ -3905,6 +3905,18 @@ nc4_convert_type(const void *src, void *dest,
    return NC_NOERR;
 }
 
+static int
+match(NC_VAR_INFO_T* var, NC_DIM_INFO_T* dim, int d)
+{
+    if (var->dimscale_hdf5_objids[d].fileno[0] == dim->hdf5_objid.fileno[0] &&
+        var->dimscale_hdf5_objids[d].objno[0] == dim->hdf5_objid.objno[0] &&
+        var->dimscale_hdf5_objids[d].fileno[1] == dim->hdf5_objid.fileno[1] &&
+        var->dimscale_hdf5_objids[d].objno[1] == dim->hdf5_objid.objno[1])
+	return 1;
+    return 0;
+}
+
+
 /**
  * @internal In our first pass through the data, we may have
  * encountered variables before encountering their dimscales, so go
@@ -3943,6 +3955,7 @@ nc4_rec_match_dimscales(NC_GRP_INFO_T *grp)
       int ndims;
       int d;
       if (!var) continue;
+
       /* Check all vars and see if dim[i] != NULL if dimids[i] valid. */
       ndims = var->dim.ndims;
       for (d = 0; d < ndims; d++)
@@ -3972,13 +3985,10 @@ nc4_rec_match_dimscales(NC_GRP_INFO_T *grp)
                for (g = grp; g && !finished; g = g->parent)
                {
 	          int j,m;
-                  m = NC_listmap_size(&grp->vars);
+                  m = NC_listmap_size(&g->dim);
                   for(j=0;j<m;j++) {
-                     NC_DIM_INFO_T *dim = NC_listmap_ith(&grp->dim,j);
-                     if (var->dimscale_hdf5_objids[d].fileno[0] == dim->hdf5_objid.fileno[0] &&
-                         var->dimscale_hdf5_objids[d].objno[0] == dim->hdf5_objid.objno[0] &&
-                         var->dimscale_hdf5_objids[d].fileno[1] == dim->hdf5_objid.fileno[1] &&
-                         var->dimscale_hdf5_objids[d].objno[1] == dim->hdf5_objid.objno[1])
+                     NC_DIM_INFO_T *dim = NC_listmap_ith(&g->dim,j);
+		     if(match(var,dim,d))
                      {
                         LOG((4, "%s: for dimension %d, found dim %s",
                              __func__, d, dim->hdr.name));
@@ -4431,8 +4441,13 @@ NC4_get_strict_att(NC_HDF5_FILE_INFO_T* h5)
    /* Get root group */
    grp = h5->root_grp->hdf_grpid; /* get root group */
    /* Try to extract the NC3_STRICT_ATT_NAME attribute */
-   attid = H5Aopen_name(grp, NC3_STRICT_ATT_NAME);
-   H5Aclose(attid);
+   /* Does it exist? */
+   if(H5Aexists(grp, NC3_STRICT_ATT_NAME) > 0) {
+	/* It exists */
+        attid = H5Aopen_name(grp, NC3_STRICT_ATT_NAME);
+        if(attid >= 0)
+            H5Aclose(attid);
+   }
    return attid;
 }
 

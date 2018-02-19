@@ -254,7 +254,7 @@ nc4_nc4f_list_add(NC *nc, const char *path, int mode)
    h5->alldims = nclistnew();
    h5->allgroups = nclistnew();
    h5->alltypes = nclistnew();
-   { /* Add null entries for the atomic types */
+   { /* Add null entries upto the first user type  */
       int i;
       for(i=0;i<NC_FIRSTUSERTYPEID;i++)
 	nclistpush(h5->alltypes,NULL);
@@ -401,7 +401,7 @@ nc4_rec_find_grp(NC_GRP_INFO_T *start_grp, int target_nc_grpid)
    assert(start_grp);
 
    /* Is this the group we are searching for? */
-   if (start_grp->nc_grpid == target_nc_grpid)
+   if (start_grp->hdr.id == target_nc_grpid)
       return start_grp;
 
    /* Shake down the kids. */
@@ -514,7 +514,7 @@ nc4_find_var(NC_GRP_INFO_T *grp, const char *name, NC_VAR_INFO_T **varp)
 {
    NC_VAR_INFO_T* var = NULL;
 
-   assert(grp && var && name);
+   assert(grp && name);
 
    /* Find the var info. */
    var = (NC_VAR_INFO_T*)NC_listmap_get(&grp->vars,name);
@@ -647,7 +647,7 @@ nc4_find_dim_len(NC_GRP_INFO_T *grp, int dimid, size_t **len)
    int i,n;
 
    assert(grp && len);
-   LOG((3, "nc4_find_dim_len: grp->name %s dimid %d", grp->name, dimid));
+   LOG((3, "nc4_find_dim_len: grp->hdr.name %s dimid %d", grp->hdr.name, dimid));
 
    /* If there are any groups, call this function recursively on them. */
    n = NC_listmap_size(&grp->children);
@@ -698,9 +698,9 @@ nc4_find_grp_att(NC_GRP_INFO_T *grp, int varid, const char *name, int attnum,
    NC_VAR_INFO_T *var;
    NC_listmap *attlist = NULL;
 
-   assert(grp && grp->name);
-   LOG((4, "nc4_find_grp_att: grp->name %s varid %d name %s attnum %d",
-        grp->name, varid, name, attnum));
+   assert(grp && grp->hdr.name);
+   LOG((4, "nc4_find_grp_att: grp->hdr.name %s varid %d name %s attnum %d",
+        grp->hdr.name, varid, name, attnum));
 
    /* Get either the global or a variable attribute list. */
    if (varid == NC_GLOBAL)
@@ -789,6 +789,7 @@ nc4_find_nc_att(int ncid, int varid, const char *name, int attnum,
    if(att == NULL)
       /* If we get here, we couldn't find the attribute. */
       return NC_ENOTATT;
+   if(attp) *attp = att;
    return NC_NOERR;
 }
 
@@ -850,6 +851,8 @@ nc4_att_new(const char* name, NC_ATT_INFO_T **attp)
 
    if (!(new_att = calloc(1, sizeof(NC_ATT_INFO_T))))
       return NC_ENOMEM;
+
+   new_att->hdr.sort = NCATT;
 
    if((new_att->hdr.name = strdup(name)) == NULL) {
 	free(new_att);
@@ -939,17 +942,18 @@ int
 nc4_grp_list_add(NC_HDF5_FILE_INFO_T* h5, NC_GRP_INFO_T *new_grp)
 {
    int new_nc_grpid = nclistlength(h5->allgroups);
-   LOG((3, "%s: new_nc_grpid %d name %s ", __func__, new_nc_grpid, new_grp->name));
+   LOG((3, "%s: new_nc_grpid %d name %s ", __func__, new_nc_grpid, new_grp->hdr.name));
    NC_GRP_INFO_T* parent_grp = new_grp->parent;
-
-   /* Fill in this group's information. */
-   new_grp->nc4_info = h5;
 
    /* Add object to allgroups list and parent list*/
    nclistpush(h5->allgroups, new_grp);
-   /* If grp is NULL, then we are creating the root group so no parent */
+   new_grp->hdr.id = new_nc_grpid;
+   /* If parent_grp is NULL, then we are creating the root group so no parent */
    if(parent_grp != NULL)
      NC_listmap_add(&parent_grp->children, (NC_OBJ*)new_grp);
+
+   /* Fill in this group's information. */
+   new_grp->nc4_info = h5;
 
    return NC_NOERR;
 }
@@ -1240,9 +1244,16 @@ nc4_type_new(nc_type typeclass, size_t size, const char *name, NC_TYPE_INFO_T **
    }
 
    /* Remember info about this type. */
+   new_type->hdr.sort = NCTYP;
    new_type->nc_type_class = typeclass; 
    new_type->size = size;
    *typep = new_type;
+   /* Initialize based on class */
+   switch (typeclass) {
+   case NC_ENUM: new_type->u.e.members = nclistnew(); break;
+   case NC_COMPOUND: new_type->u.c.fields = nclistnew(); break;
+   default: /*nothing to do*/ break;
+   }
    return NC_NOERR;
 }
 
@@ -1293,7 +1304,7 @@ nc4_field_new(const char *name,
       return NC_ENOMEM;
 
    /* Fill in the index as best we can */
-   field->hdr.sort = NCDIM;
+   field->hdr.sort = NCVAR;
    field->hdr.name = dupname(name);
    if(field->hdr.name == NULL) {
 	free(field);
@@ -1327,8 +1338,8 @@ int
 nc4_field_free(NC_FIELD_INFO_T *field)
 {
    /* Free some stuff. */
-   if (field->name)
-      free(field->name);
+   if (field->hdr.name)
+      free(field->hdr.name);
    if (field->dims.dim_size)
       free(field->dims.dim_size);
    /* free the memory. */
@@ -1352,7 +1363,7 @@ nc4_field_list_add(NC_TYPE_INFO_T* parent, NC_FIELD_INFO_T* field)
    /* Add object to list */
    if(parent->u.c.fields == NULL
 	&& (parent->u.c.fields = nclistnew()) == NULL) return NC_ENOMEM;
-   field->fieldid = nclistlength(parent->u.c.fields);
+   field->hdr.id = nclistlength(parent->u.c.fields);
    nclistpush(parent->u.c.fields,field);
    return NC_NOERR;
 }
@@ -1521,10 +1532,13 @@ nc4_att_list_del(NC_listmap* list, NC_ATT_INFO_T *att)
     if(attlist == NULL)
 	return NC_EINTERNAL;
     /* Re-number all the higher attribute ids */
-    for(i=att->hdr.id;i<size;i++) {
+    for(i=att->hdr.id+1;i<size;i++) {
 	tmp = attlist[i];
 	tmp->hdr.id--;
     }
+    /* Now remove the target attribute from listmap */
+    if(!NC_listmap_idel(list,att->hdr.id))
+	return NC_EINTERNAL;
     /* Now, rebuild the att listmap */
     if(!NC_listmap_rehash(list))
 	return NC_EINTERNAL;
@@ -1863,7 +1877,7 @@ rec_print_metadata(NC_GRP_INFO_T *grp, int tab_count)
    tabs[t] = '\0';
 
    LOG((2, "%s GROUP - %s nc_grpid: %d nvars: %lu natts: %lu",
-        tabs, grp->hdr.name, grp->nc_grpid, NC_listmap_size(&grp->vars), NC_listmap_size(&grp->att)));
+        tabs, grp->hdr.name, grp->hdr.id, NC_listmap_size(&grp->vars), NC_listmap_size(&grp->att)));
 
    n = NC_listmap_size(&grp->att);
    for(i=0;i<n;i++) {
@@ -1912,14 +1926,13 @@ rec_print_metadata(NC_GRP_INFO_T *grp, int tab_count)
    for(i=0;i<n;i++) {
       type = (NC_TYPE_INFO_T*)NC_listmap_ith(&grp->type,i);
       LOG((2, "%s TYPE - nc_typeid: %d hdf_typeid: 0x%x size: %d committed: %d "
-           "name: %s num_fields: %d", tabs, type->hdr.id,
-           type->hdf_typeid, type->size, (int)type->committed, type->hdr.name,
-           nclistlength(type->u.c.fields)));
+               "name: %s", tabs, type->hdr.id,
+               type->hdf_typeid, type->size, (int)type->committed, type->hdr.name));
       /* Is this a compound type? */
       if (type->nc_type_class == NC_COMPOUND)
       {
 	 int i;
-         LOG((3, "compound type"));
+         LOG((3, "compound type: "));
 	 for (i=0;i<nclistlength(type->u.c.fields);i++) {
 	    field = nclistget(type->u.c.fields,i);
             LOG((4, "field %s offset %d nctype %d ndims %d", field->hdr.name,
@@ -1935,8 +1948,12 @@ rec_print_metadata(NC_GRP_INFO_T *grp, int tab_count)
          LOG((3, "Opaque type"));
       else if (type->nc_type_class == NC_ENUM)
       {
-         LOG((3, "Enum type"));
+         LOG((3, "Enum type: "));
          LOG((4, "base_nc_type: %d", type->u.e.base_nc_typeid));
+	 for (i=0;i<nclistlength(type->u.e.members);i++) {
+	    NC_ENUM_MEMBER_INFO_T* mem = nclistget(type->u.e.members,i);
+            LOG((4, "member %s", mem->name));
+	 }
       }
       else
       {

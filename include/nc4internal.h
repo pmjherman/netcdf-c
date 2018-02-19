@@ -207,8 +207,6 @@ typedef struct NC_VAR_INFO
 
 typedef struct NC_FIELD_INFO
 {
-   char* name;
-   int fieldid;                 /* ID (index?) of field */
    NC_OBJ hdr;
    nc_type nc_typeid;
    hid_t hdf_typeid;
@@ -280,9 +278,7 @@ typedef struct NC_TYPE_INFO
 typedef struct NC_GRP_INFO
 {
    NC_OBJ hdr;
-   char *name;			/* must be first */
    hid_t hdf_grpid;
-   int nc_grpid;
    struct NC_HDF5_FILE_INFO *nc4_info;
    struct NC_GRP_INFO *parent;
    NC_listmap children;		/* NC_listmap<struct NC_GRP_INFO*> */
@@ -406,6 +402,7 @@ int nc4_field_free(NC_FIELD_INFO_T*);
 
 /* These list functions add and delete vars, atts. */
 /* Delete functions only exist when the deletion has complications */
+int nc4_vararray_add(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var);
 int nc4_nc4f_list_add(NC *nc, const char *path, int mode);
 int nc4_dim_list_add(NC_GRP_INFO_T*, NC_DIM_INFO_T *dim);
 int nc4_att_list_add(NC_listmap* list, NC_ATT_INFO_T *att);

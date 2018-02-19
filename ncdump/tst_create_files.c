@@ -258,7 +258,10 @@ main(int argc, char **argv)
 			     NC_FLOAT)) ERR;
       if (nc_put_att(ncid, NC_GLOBAL, ATT_NAME_CMP, typeid, NUM_FAVS, favs)) ERR;
 
-      if (nc_close(ncid)) ERR;
+{ int r;
+      if ((r=nc_close(ncid)))
+	ERR;
+}
    }
 
    SUMMARIZE_ERR;

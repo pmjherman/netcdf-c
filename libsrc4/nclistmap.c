@@ -28,6 +28,8 @@ Warning: This code depends critically on the assumption that
 /* Keep the table sizes small initially */
 #define DFALTTABLESIZE 7
 
+extern void printhashmap(NC_hashmap*);
+
 /* Locate object by name in an NC_LISTMAP */
 NC_OBJ*
 NC_listmap_get(NC_listmap* listmap, const char* name)
@@ -82,6 +84,24 @@ NC_listmap_add(NC_listmap* listmap, NC_OBJ* obj)
    return 1;
 }
 
+/* Remove object from listmap by index in the vector.
+ * WARNING: This will compress the vector by one, so
+ * object id's may be affected. 
+ * Return 1 if ok, 0 otherwise.*/
+int
+NC_listmap_idel(NC_listmap* listmap, size_t index)
+{
+   NC_OBJ* obj;
+   if(listmap == NULL) return 0;
+   obj = nclistremove(listmap->list,index);
+   if(obj == NULL)
+	return 0; /* not present */
+   /* Remove from the hash map by deactivating its entry */
+   if(!NC_hashmapdeactivate(listmap->map,(uintptr_t)index))
+	return 0; /* not present */
+   return 1;
+}
+
 #if 0
 /* Add object at specific index; will overwrite anything already there;
    obj == NULL is ok.
@@ -127,20 +147,6 @@ NC_listmap_del(NC_listmap* listmap, NC_OBJ* target)
       all higher entries */
    nclistset(listmap->list,(size_t)pos,NULL);
    return 1;
-}
-
-/* Remove object from listmap by index */
-/* WARNING: This will leave a NULL hole in the vector */
-/* Return 1 if ok, 0 otherwise.*/
-int
-NC_listmap_idel(NC_listmap* listmap, size_t index)
-{
-   NC_OBJ* obj;
-   if(listmap == NULL) return 0;
-   obj = nclistget(listmap->list,index);
-   if(obj == NULL)
-	return 0; /* not present */
-   return NC_listmap_del(listmap,obj);
 }
 
 /* Pseudo iterator; start index at 0, return 0 when complete.
@@ -252,7 +258,6 @@ keystr(NC_hentry* e)
 	return (const char*)(e->key);
 }
 
-
 int
 NC_listmap_verify(NC_listmap* lm, int dump)
 {
@@ -355,3 +360,41 @@ done:
     return (nerrs > 0 ? 0: 1);
 }
 
+static const char*
+sortname(NC_SORT sort)
+{
+    switch(sort) {
+    case NCVAR: return "NCVAR";
+    case NCDIM: return "NCDIM";
+    case NCATT: return "NCATT";
+    case NCTYP: return "NCTYP";
+    case NCGRP: return "NCGRP";
+    default: break;
+    }
+    return "unknown";
+}
+
+void
+printlistmaplist(NC_listmap* lm)
+{
+    int i;
+    if(lm == NULL) {
+	fprintf(stderr,"<empty>\n");
+	return;
+    }
+    for(i=0;i<nclistlength(lm->list);i++) {
+	NC_OBJ* o = (NC_OBJ*)nclistget(lm->list,i);
+        fprintf(stderr,"[%ld] sort=%s name=|%s| id=%lu\n",
+		(unsigned long)i,sortname(o->sort),o->name,(unsigned long)o->id);
+    }
+}
+
+void
+printlistmapmap(NC_listmap* lm)
+{
+    if(lm == NULL) {
+	fprintf(stderr,"<empty>\n");
+	return;
+    }
+    printhashmap(lm->map);
+}

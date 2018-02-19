@@ -241,7 +241,16 @@ The sort is one of the values NCVAR, NCDIM, NCATT, NCTYP, or NCGRP.
 The name is assumed to be nul terminated. The id is the assigned id
 for the object.
 
-\section S5 Notes and Warning
+\section S5 Implementation Alternatives.
+
+1. As an alternative to the use of the alldims, allgrps, etc.,
+vectors, we could use a listmap that maps the object id to
+the vector index of the object with that id. This would allow
+us to have holes in the object id space and still have O(1)
+access time. This would require keeping (as it was before)
+various object id counters.
+
+\section S6 Notes and Warning
 
 1. NC_Listmap is currently not used for enum constants and compound fields.
 Additionally, it is not used for listing the dimensions associated

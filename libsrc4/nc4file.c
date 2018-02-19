@@ -20,6 +20,8 @@
 #include <H5Fpublic.h>
 #include <hdf5_hl.h>
 
+extern int nc4_vararray_add(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var);
+
 /** @internal When we have open objects at file close, should
     we log them or print to stdout. Default is to log. */
 #define LOGOPEN 1
@@ -623,7 +625,7 @@ close_netcdf4_file(NC_HDF5_FILE_INFO_T *h5, int abort)
    nclistclear(h5->alldims);
 
    /* Delete all the known types */
-   for(i=0;i<nclistlength(h5->alltypes);i++) {
+   for(i=NC_FIRSTUSERTYPEID;i<nclistlength(h5->alltypes);i++) {
       NC_TYPE_INFO_T* type = (NC_TYPE_INFO_T*)nclistget(h5->alltypes,i);
       if(type == NULL) continue; /* should not happen */
       LOG((4, "%s: deleting type %s", __func__, type->hdr.name));
@@ -648,11 +650,6 @@ close_netcdf4_file(NC_HDF5_FILE_INFO_T *h5, int abort)
 	 return retval;
    }   
    nclistclear(h5->allgroups);
-
-   /* Clean up the NC_HDF5_FILE_INFO_T file object */
-   nclistfree(h5->alldims);
-   nclistfree(h5->alltypes);
-   nclistfree(h5->allgroups);
 
    /* Close hdf file. */
 #ifdef USE_PARALLEL4
@@ -749,7 +746,7 @@ size_t nc4_chunk_cache_size = CHUNK_CACHE_SIZE;            /**< Default chunk ca
 size_t nc4_chunk_cache_nelems = CHUNK_CACHE_NELEMS;        /**< Default chunk cache number of elements. */
 float nc4_chunk_cache_preemption = CHUNK_CACHE_PREEMPTION; /**< Default chunk cache preemption. */
 
-#define NUM_TYPES 12 /**< Number of netCDF atomic types. */
+#define NUM_TYPES NC_MAX_ATOMIC_TYPE /**< Number of netCDF atomic types. */
 
 /** @internal Native HDF5 constants for atomic types. For performance,
  * fill this array only the first time, and keep it in global memory
@@ -1180,6 +1177,9 @@ done:
  * this is a dimension without a variable - that is, a coordinate
  * dimension which does not have any coordinate data.
  *
+ * Note: it appears that this is called for all dimensions, not just
+ * scale dimensions. So name is misleading.
+ *
  * Note, I believe this is completely wrong. It is making some kind of
  * assumption about NC_DIMID_ATT_NAME that is undocumented AFAIK.
  * I really hate dimension scales.
@@ -1254,9 +1254,9 @@ read_scale(NC_GRP_INFO_T *grp, hid_t datasetid, const char *obj_name,
          nclistset(h5->alldims,new_dim->hdr.id,new_dim);
       }
 #else
+      /* Assign dimid */
       if(new_dim->hdr.id != nclistlength(h5->alldims))
 	return NC_EINTERNAL;
-      /* Assign dimid */
       nclistpush(h5->alldims,new_dim);
 #endif
    }
@@ -1582,7 +1582,7 @@ read_type(NC_GRP_INFO_T *grp, hid_t hdf_typeid, char *type_name)
 
    assert(grp && type_name);
 
-   LOG((4, "%s: type_name %s grp->name %s", __func__, type_name, grp->name));
+   LOG((4, "%s: type_name %s grp->name %s", __func__, type_name, grp->hdr.name));
 
    /* What is the native type for this platform? */
    if ((native_typeid = H5Tget_native_type(hdf_typeid, H5T_DIR_DEFAULT)) < 0)
@@ -2087,6 +2087,7 @@ read_var(NC_GRP_INFO_T *grp, hid_t datasetid, const char *obj_name,
       dim->coord_var = var;
    }
    /* If this is not a scale, but has scales, iterate
+
     * through them. (i.e. this is a variable that is not a
     * coordinate variable) */
    else
@@ -2443,8 +2444,8 @@ nc4_rec_read_metadata(NC_GRP_INFO_T *grp)
    H5_index_t iter_index;
    int retval = NC_NOERR; /* everything worked! */
 
-   assert(grp && grp->name);
-   LOG((3, "%s: grp->name %s", __func__, grp->name));
+   assert(grp && grp->hdr.name);
+   LOG((3, "%s: grp->name %s", __func__, grp->hdr.name));
 
    /* Portably initialize user data for later */
    memset(&udata, 0, sizeof(udata));
@@ -2456,7 +2457,7 @@ nc4_rec_read_metadata(NC_GRP_INFO_T *grp)
       if (grp->parent)
       {
          if ((grp->hdf_grpid = H5Gopen2(grp->parent->hdf_grpid,
-                                        grp->name, H5P_DEFAULT)) < 0)
+                                        grp->hdr.name, H5P_DEFAULT)) < 0)
             BAIL(NC_EHDFERR);
       }
       else
@@ -2490,6 +2491,7 @@ nc4_rec_read_metadata(NC_GRP_INFO_T *grp)
 
    /* Set user data for iteration */
    udata.grp = grp;
+   udata.grps = nclistnew();
 
    /* Iterate over links in this group, building lists for the types,
     *  datasets and groups encountered
@@ -2557,7 +2559,7 @@ nc4_rec_read_metadata(NC_GRP_INFO_T *grp)
          free(oinfo);
       }
    }
-
+   nclistfree(udata.grps); /* always do this */
    return retval;
 }
 

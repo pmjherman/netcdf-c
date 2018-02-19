@@ -69,7 +69,7 @@ NC4_def_grp(int parent_ncid, const char *name, int *new_ncid)
    if ((retval = nc4_grp_list_add(h5, subgrp)))
       return retval;
    if (new_ncid)
-      *new_ncid = parent_grp->nc4_info->controller->ext_ncid | subgrp->nc_grpid;
+      *new_ncid = parent_grp->nc4_info->controller->ext_ncid | subgrp->hdr.id;
    return NC_NOERR;
 }
 
@@ -92,6 +92,7 @@ int
 NC4_rename_grp(int grpid, const char *name)
 {
    NC_GRP_INFO_T *grp;
+   NC_GRP_INFO_T *parent;
    NC_HDF5_FILE_INFO_T *h5;
    char norm_name[NC_MAX_NAME + 1];
    int retval;
@@ -136,7 +137,7 @@ NC4_rename_grp(int grpid, const char *name)
       if (grp->parent->hdf_grpid)
       {
          /* Rename the group */
-         if (H5Gmove(grp->parent->hdf_grpid, grp->name, name) < 0)
+         if (H5Gmove(grp->parent->hdf_grpid, grp->hdr.name, name) < 0)
             return NC_EHDFERR;
 
          /* Reopen the group, with the new name */
@@ -147,10 +148,15 @@ NC4_rename_grp(int grpid, const char *name)
 
    /* Give the group its new name in metadata. UTF8 normalization
     * has been done. */
-   free(grp->name);
-   if (!(grp->name = malloc((strlen(norm_name) + 1) * sizeof(char))))
+   free(grp->hdr.name);
+   if (!(grp->hdr.name = malloc((strlen(norm_name) + 1) * sizeof(char))))
       return NC_ENOMEM;
-   strcpy(grp->name, norm_name);
+   strcpy(grp->hdr.name, norm_name);
+   /* Because the name may be referenced in the hashmap of the listmap
+      of the containing group, change name and then rehash the listmap */
+   parent = grp->parent;
+   if(!NC_listmap_rehash(&parent->children))
+	return NC_EINTERNAL;
 
    return NC_NOERR;
 }
@@ -192,7 +198,7 @@ NC4_inq_ncid(int ncid, const char *name, int *grp_ncid)
    g = (NC_GRP_INFO_T*)NC_listmap_get(&grp->children,norm_name);
    if(g != NULL) {
 	 if (grp_ncid)
-	    *grp_ncid = grp->nc4_info->controller->ext_ncid | g->nc_grpid;
+	    *grp_ncid = grp->nc4_info->controller->ext_ncid | g->hdr.id;
 	 return NC_NOERR;
    }
 
@@ -234,10 +240,10 @@ NC4_inq_grps(int ncid, int *numgrps, int *ncids)
       for(i=0;i<num;i++) {
          NC_GRP_INFO_T *g;
 	 g = NC_listmap_ith(&grp->children,i);
-	 /* Combine the nc_grpid in a bitwise or with the ext_ncid,
+	 /* Combine the hdr.id in a bitwise or with the ext_ncid,
 	  * which allows the returned ncid to carry both file and
 	  * group information. */
-	 ncids[i] = (g->nc_grpid | g->nc4_info->controller->ext_ncid);
+	 ncids[i] = (g->hdr.id | g->nc4_info->controller->ext_ncid);
       }
    }
    
@@ -274,7 +280,7 @@ NC4_inq_grpname(int ncid, char *name)
 
    /* Copy the name. */
    if (name)
-      strcpy(name, grp->name);
+      strcpy(name, grp->hdr.name);
 
    return NC_NOERR;
 }
@@ -379,7 +385,7 @@ NC4_inq_grp_parent(int ncid, int *parent_ncid)
    if (grp->parent)
    {
       if (parent_ncid)
-	 *parent_ncid = grp->nc4_info->controller->ext_ncid | grp->parent->nc_grpid;
+	 *parent_ncid = grp->nc4_info->controller->ext_ncid | grp->parent->hdr.id;
    }
    else
       return NC_ENOGRP;
@@ -495,7 +501,7 @@ NC4_inq_varids(int ncid, int *nvars, int *varids)
          NC_VAR_INFO_T *var;
          var = NC_listmap_ith(&grp->vars,i);
          if (!var) continue;
-         varids[num_vars] = var->hdr.id;
+         varids[i] = var->hdr.id;
       }
    }
 

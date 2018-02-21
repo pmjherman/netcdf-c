@@ -138,7 +138,7 @@ nc4_get_att(int ncid, int varid, const char *name, nc_type *xtype,
 
    /* Check varid */
    if (varid != NC_GLOBAL) {
-      if (NC_listmap_ith(&grp->vars,varid) == NULL)
+      if (ncindexith(grp->vars,varid) == NULL)
          return NC_ENOTVAR;
    }
 
@@ -381,12 +381,11 @@ NC4_rename_att(int ncid, int varid, const char *name, const char *newname)
    NC_HDF5_FILE_INFO_T *h5;
    NC_VAR_INFO_T *var = NULL;
    NC_ATT_INFO_T *att;
-   NC_listmap* list;
+   NCindex* list;
    char norm_newname[NC_MAX_NAME + 1], norm_name[NC_MAX_NAME + 1];
    hid_t datasetid = 0;
    int retval = NC_NOERR;
    char* oldname =  NULL;
-   NC_OBJ** duplist;
 
    if (!name || !newname)
       return NC_EINVAL;
@@ -414,24 +413,24 @@ NC4_rename_att(int ncid, int varid, const char *name, const char *newname)
    /* Is norm_newname in use? */
    if (varid == NC_GLOBAL)
    {
-      list = &grp->att;
+      list = grp->att;
    }
    else
    {
-      var = (NC_VAR_INFO_T*)NC_listmap_ith(&grp->vars,varid);
+      var = (NC_VAR_INFO_T*)ncindexith(grp->vars,varid);
       if (!var) return NC_ENOTVAR;
       assert(var->hdr.id == varid);
-      list = &var->att;
+      list = var->att;
    }
 
-   att = (NC_ATT_INFO_T*)NC_listmap_get(list,norm_newname);
+   att = (NC_ATT_INFO_T*)ncindexlookup(list,norm_newname);
    if(att != NULL)
 	return NC_ENAMEINUSE;
 
    /* Normalize name and find the attribute. */
    if ((retval = nc4_normalize_name(name, norm_name)))
       return retval;
-   att = (NC_ATT_INFO_T*)NC_listmap_get(list,norm_name);
+   att = (NC_ATT_INFO_T*)ncindexlookup(list,norm_name);
    if (!att)
       return NC_ENOTATT;
 
@@ -466,14 +465,6 @@ NC4_rename_att(int ncid, int varid, const char *name, const char *newname)
    strcpy(att->hdr.name, norm_newname);
    att->dirty = NC_TRUE;
 
-    /* Get a duplicate of the listmap vector's contents */
-    duplist = NC_listmap_dup(list);
-    if(duplist == NULL)
-	return NC_EINTERNAL;
-    /* Now, rebuild the att listmap */
-    if(!NC_listmap_rehash(list))
-	return NC_EINTERNAL;
-
    /* Mark attributes on variable dirty, so they get written */
    if(var)
       var->attr_dirty = NC_TRUE;
@@ -502,7 +493,7 @@ NC4_del_att(int ncid, int varid, const char *name)
    NC_HDF5_FILE_INFO_T *h5;
    NC_ATT_INFO_T *att;
    NC_VAR_INFO_T *var;
-   NC_listmap* attlist = NULL;
+   NCindex* attlist = NULL;
    hid_t locid = 0, datasetid = 0;
    int retval = NC_NOERR;
 
@@ -535,23 +526,23 @@ NC4_del_att(int ncid, int varid, const char *name)
       out the HDF5 location it's attached to. */
    if (varid == NC_GLOBAL)
    {
-      attlist = &grp->att;
+      attlist = grp->att;
       locid = grp->hdf_grpid;
    }
    else
    {
-      if (varid < 0 || varid >= NC_listmap_size(&grp->vars))
+      if (varid < 0 || varid >= ncindexsize(grp->vars))
          return NC_ENOTVAR;
-      var = (NC_VAR_INFO_T*)NC_listmap_ith(&grp->vars,varid);
+      var = (NC_VAR_INFO_T*)ncindexith(grp->vars,varid);
       if (!var) return NC_ENOTVAR;
-      attlist = &var->att;
+      attlist = var->att;
       assert(var->hdr.id == varid);
       if (var->created)
          locid = var->hdf_datasetid;
    }
 
    /* Now find the attribute by name */
-   att = (NC_ATT_INFO_T*)NC_listmap_get(attlist,name);
+   att = (NC_ATT_INFO_T*)ncindexlookup(attlist,name);
 
    /* If att is NULL, we couldn't find the attribute. */
    if (!att)
@@ -604,7 +595,7 @@ NC4_put_att(int ncid, int varid, const char *name, nc_type file_type,
    NC_HDF5_FILE_INFO_T *h5;
    NC_VAR_INFO_T *var = NULL;
    NC_ATT_INFO_T *att = NULL;
-   NC_listmap* attlist = NULL;
+   NCindex* attlist = NULL;
    char norm_name[NC_MAX_NAME + 1];
    nc_bool_t new_att = NC_FALSE;
    int retval = NC_NOERR, range_error = 0;
@@ -619,6 +610,16 @@ NC4_put_att(int ncid, int varid, const char *name, nc_type file_type,
 
    /* Find att, if it exists. (Must check varid first or nc_test will
     * break.) */
+   if (varid == NC_GLOBAL)
+      attlist = grp->att;
+   else
+   {
+      var = (NC_VAR_INFO_T*)ncindexith(grp->vars,varid);
+      if (!var) return NC_ENOTVAR;
+      attlist = var->att;
+      assert(var->hdr.id == varid);
+   }
+
    /* The length needs to be positive (cast needed for braindead
       systems with signed size_t). */
    if((unsigned long) len > X_INT_MAX)
@@ -639,20 +640,6 @@ NC4_put_att(int ncid, int varid, const char *name, nc_type file_type,
    if (h5->no_write)
       return NC_EPERM;
 
-   /* Find att, if it exists. (Must check varid first or nc_test will
-    * break.) */
-   if (varid == NC_GLOBAL)
-      attlist = &grp->att;
-   else
-   {
-      if (varid < 0 || varid >= NC_listmap_size(&grp->vars))
-	return NC_ENOTVAR;
-      var = (NC_VAR_INFO_T*)NC_listmap_ith(&grp->vars,varid);
-      if (!var) return NC_ENOTVAR;
-      attlist = &var->att;
-      assert(var->hdr.id == varid);
-   }
-
    /* Check and normalize the name. */
    if ((retval = nc4_check_name(name, norm_name)))
       return retval;
@@ -666,7 +653,7 @@ NC4_put_att(int ncid, int varid, const char *name, nc_type file_type,
 	    return NC_ENAMEINUSE;
    }
 
-   att = (NC_ATT_INFO_T*)NC_listmap_get(attlist,norm_name);
+   att = (NC_ATT_INFO_T*)ncindexlookup(attlist,norm_name);
 
    if (!att)
    {

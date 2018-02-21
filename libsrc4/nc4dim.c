@@ -53,10 +53,10 @@ NC4_inq_unlimdim(int ncid, int *unlimdimidp)
       for (g = grp; g && !found; g = g->parent)
       {
           int k;
-          size_t count = NC_listmap_size(&g->dim);
+          size_t count = ncindexsize(g->dim);
 	  /* Walk the dimension vector */
           for(k=0;k<count;k++) {
-	      dim = (NC_DIM_INFO_T*)NC_listmap_ith(&g->dim,k);
+	      dim = (NC_DIM_INFO_T*)ncindexith(g->dim,k);
               if (dim->unlimited) {
 	          *unlimdimidp = dim->hdr.id;
 	          found++;
@@ -119,9 +119,9 @@ NC4_def_dim(int ncid, const char *name, size_t len, int *idp)
       /* Only one limited dimenson for strict nc3. */
       if (len == NC_UNLIMITED) {
 	int k;
-	size_t count = NC_listmap_size(&grp->dim);
+	size_t count = ncindexsize(grp->dim);
 	for(k=0;k<count;k++) {
-	    dim = (NC_DIM_INFO_T*)NC_listmap_ith(&grp->dim,k);
+	    dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,k);
 	    if (dim->unlimited)
 	       return NC_EUNLIMIT;
         }
@@ -142,7 +142,7 @@ NC4_def_dim(int ncid, const char *name, size_t len, int *idp)
          return NC_EDIMSIZE;
 
    /* Make sure the name is not already in use. */
-   dim = (NC_DIM_INFO_T*)NC_listmap_get(&grp->dim,norm_name);
+   dim = (NC_DIM_INFO_T*)ncindexlookup(grp->dim,norm_name);
    if(dim != NULL)
        return NC_ENAMEINUSE;
 
@@ -213,7 +213,7 @@ NC4_inq_dimid(int ncid, const char *name, int *idp)
 
    /* Recurse upward and check for a name match. */
    for (g = grp; g && !finished; g = g->parent) {
-      dim = (NC_DIM_INFO_T*)NC_listmap_get(&g->dim,norm_name);
+      dim = (NC_DIM_INFO_T*)ncindexlookup(g->dim,norm_name);
       if(dim != NULL) {/* found it */
             if (idp)
                *idp = dim->hdr.id;
@@ -341,7 +341,7 @@ NC4_rename_dim(int ncid, int dimid, const char *name)
       return retval;
 
    /* Check if name is in use, and retain a pointer to the correct dim */
-   tmp_dim = (NC_DIM_INFO_T*)NC_listmap_get(&grp->dim, norm_name);
+   tmp_dim = (NC_DIM_INFO_T*)ncindexlookup(grp->dim, norm_name);
    if(tmp_dim != NULL)
      return NC_ENAMEINUSE; /* Dim with that new name already defined in group */
 
@@ -350,7 +350,7 @@ NC4_rename_dim(int ncid, int dimid, const char *name)
    if(dim == NULL)
 	return NC_EBADDIM; /* no such dim */
    /* Make sure this dim is within this grp */
-   tmp_dim = (NC_DIM_INFO_T*)NC_listmap_get(&grp->dim,dim->hdr.name);
+   tmp_dim = (NC_DIM_INFO_T*)ncindexlookup(grp->dim,dim->hdr.name);
    if(tmp_dim == NULL || tmp_dim->hdr.id != dim->hdr.id)
       return NC_EBADDIM; /* this should never happen, but better safe...*/
 
@@ -372,11 +372,6 @@ NC4_rename_dim(int ncid, int dimid, const char *name)
    free(dim->hdr.name);
    if((dim->hdr.name = strdup(norm_name)) == NULL)
       return NC_ENOMEM;
-   /* We need to rehash the dim using the newname within the grp;
-      note that since the dimid and the memory is not changed, we do not need
-      to do anything to references to this dim in e.g. h5->alldims */
-   if(!NC_listmap_rehash(&grp->dim))
-      return NC_EINVAL;
 
    /* Check if dimension was a coordinate variable, but names are
     * different now */
@@ -449,9 +444,9 @@ NC4_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
    assert(h5);
    {
       int k;
-      int count = NC_listmap_size(&grp->dim);
+      int count = ncindexsize(grp->dim);
       for(k=0;k<count;k++) {
-         dim = (NC_DIM_INFO_T*)NC_listmap_ith(&grp->dim,k);
+         dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,k);
 	 if (dim->unlimited)
 	 {
 	    if (unlimdimidsp)

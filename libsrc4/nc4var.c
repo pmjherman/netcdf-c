@@ -100,7 +100,7 @@ NC4_set_var_chunk_cache(int ncid, int varid, size_t size, size_t nelems,
    assert(nc && grp && h5);
 
    /* Find the var. */
-   var = (NC_VAR_INFO_T*)NC_listmap_ith(&grp->vars,varid);
+   var = (NC_VAR_INFO_T*)ncindexith(grp->vars,varid);
    if (!var) return NC_ENOTVAR;
    assert(var->hdr.id == varid);
 
@@ -181,7 +181,7 @@ NC4_get_var_chunk_cache(int ncid, int varid, size_t *sizep,
    assert(nc && grp && h5);
 
    /* Find the var. */
-   var = (NC_VAR_INFO_T*)NC_listmap_ith(&grp->vars,varid);
+   var = (NC_VAR_INFO_T*)ncindexith(grp->vars,varid);
    if (!var) return NC_ENOTVAR;
    assert(var->hdr.id == varid);
 
@@ -407,13 +407,13 @@ nc4_find_default_chunksizes2(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var)
 int
 nc4_vararray_add(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var)
 {
-  if(!NC_listmap_initialized(&grp->vars)) {
-    NC_listmap_init(&grp->vars,0); /* Use default size */
+  if(grp->vars == NULL) {
+	if((grp->vars = ncindexnew())==NULL) return NC_ENOMEM;
   }
   if(grp == NULL || var == NULL)
       return NC_EINVAL;
-  var->hdr.id = NC_listmap_size(&grp->vars);
-  NC_listmap_add(&grp->vars,(NC_OBJ*)var);
+  var->hdr.id = ncindexsize(grp->vars);
+  ncindexadd(grp->vars,(NC_OBJ*)var);
   var->container = grp;
   return NC_NOERR;
 }
@@ -527,6 +527,9 @@ NC4_def_var(int ncid, const char *name, nc_type xtype,
     * struct. */
    if (xtype <= NC_STRING)
    {
+#if 1
+      type_info = nclistget(h5->alltypes,xtype);       
+#else
       if (!(type_info = calloc(1, sizeof(NC_TYPE_INFO_T))))
          BAIL(NC_ENOMEM);
       type_info->hdr.id = xtype;
@@ -568,6 +571,7 @@ NC4_def_var(int ncid, const char *name, nc_type xtype,
             BAIL(NC_EBADTYPID);
          }
       }
+#endif
    }
    /* If this is a user defined type, find it. */
    else
@@ -682,7 +686,7 @@ NC4_def_var(int ncid, const char *name, nc_type xtype,
     * is not a coordinate variable. I need to change its HDF5 name,
     * because the dimension will cause a HDF5 dataset to be created,
     * and this var has the same name. */
-   dim = (NC_DIM_INFO_T*)NC_listmap_get(&grp->dim,norm_name);
+   dim = (NC_DIM_INFO_T*)ncindexlookup(grp->dim,norm_name);
    if(dim != NULL)
    {
       if(!var->dim.ndims || dimidsp[0] != dim->hdr.id)
@@ -789,13 +793,13 @@ NC4_inq_var_all(int ncid, int varid, char *name, nc_type *xtypep,
    {
       if (nattsp)
       {
-	 *nattsp = NC_listmap_size(&grp->att);
+	 *nattsp = ncindexsize(grp->att);
       }
       return NC_NOERR;
    }
 
    /* Find the var. */
-   var = (NC_VAR_INFO_T*)NC_listmap_ith(&grp->vars,varid);
+   var = (NC_VAR_INFO_T*)ncindexith(grp->vars,varid);
    if (!var) return NC_ENOTVAR;
    assert(var->hdr.id == varid);
 
@@ -811,7 +815,7 @@ NC4_inq_var_all(int ncid, int varid, char *name, nc_type *xtypep,
          dimidsp[d] = var->dim.dimids[d];
    if (nattsp)
    {
-      *nattsp = NC_listmap_size(&var->att);
+      *nattsp = ncindexsize(var->att);
    }
 
    /* Chunking stuff. */
@@ -960,7 +964,7 @@ nc_def_var_extra(int ncid, int varid, int *shuffle, int *deflate,
       return NC_EPERM;
 
    /* Find the var. */
-   var = (NC_VAR_INFO_T*)NC_listmap_ith(&grp->vars,varid);
+   var = (NC_VAR_INFO_T*)ncindexith(grp->vars,varid);
    if (!var) return NC_ENOTVAR;
    assert(var->hdr.id == varid);
 
@@ -1406,7 +1410,7 @@ NC4_def_var_filter(int ncid, int varid, unsigned int id, size_t nparams,
    assert(nc && grp && h5);
 
    /* Find the var. */
-   var = (NC_VAR_INFO_T*)NC_listmap_ith(&grp->vars,varid);
+   var = (NC_VAR_INFO_T*)ncindexith(grp->vars,varid);
    if (!var) return NC_ENOTVAR;
    assert(var->hdr.id == varid);
 
@@ -1490,7 +1494,7 @@ NC4_inq_varid(int ncid, const char *name, int *varidp)
       return retval;
 
    /* Find var of this name. */
-   var = (NC_VAR_INFO_T*)NC_listmap_get(&grp->vars,norm_name);
+   var = (NC_VAR_INFO_T*)ncindexlookup(grp->vars,norm_name);
    if(var == NULL)
        return NC_ENOTVAR;
    if(varidp) *varidp = var->hdr.id;
@@ -1548,12 +1552,12 @@ NC4_rename_var(int ncid, int varid, const char *name)
       return retval;
 
    /* Get var to be renamed by its varid */
-   var = (NC_VAR_INFO_T*)NC_listmap_ith(&grp->vars,varid);
+   var = (NC_VAR_INFO_T*)ncindexith(grp->vars,varid);
    if(var == NULL)
 	return NC_ENOTVAR;
 
    /* Check if name is in use, and retain a pointer to the correct variable */
-   tmp_var = (NC_VAR_INFO_T*)NC_listmap_get(&grp->vars,name);
+   tmp_var = (NC_VAR_INFO_T*)ncindexlookup(grp->vars,name);
    if(tmp_var != NULL)
 	return NC_ENAMEINUSE;
    if(tmp_var == var)
@@ -1588,10 +1592,6 @@ NC4_rename_var(int ncid, int varid, const char *name)
    if (!(var->hdr.name = malloc((strlen(name) + 1) * sizeof(char))))
       return NC_ENOMEM;
    strcpy(var->hdr.name, name);
-
-   /* Rebuild the var listmap */
-   if(!NC_listmap_rehash(&grp->vars))
-	return NC_EINTERNAL;
 
    LOG((3, "var is now %s", var->hdr.name));
 
@@ -1677,9 +1677,9 @@ NC4_var_par_access(int ncid, int varid, int par_access)
       return NC_ENOPAR;
 
    /* Find the var, and set its preference. */
-   if (varid < 0 || varid >= NC_listmap_size(&grp->vars)
+   if (varid < 0 || varid >= ncindexsize(grp->vars)
       return NC_ENOTVAR;
-   var = nclistget(&grp-.varse,varid);
+   var = ncindexith(&grp-.varse,varid);
    if (!var) return NC_ENOTVAR;
    assert(var->hdr.id == varid);
 

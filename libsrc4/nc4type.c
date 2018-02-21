@@ -170,8 +170,8 @@ NC4_inq_typeid(int ncid, const char *name, nc_type *typeidp)
 
    /* Is the type in this group? If not, search parents. */
    for (grptwo = grp; grptwo; grptwo = grptwo->parent) {
-      /* Extract the type by name from the group's type listmap */
-      type = (NC_TYPE_INFO_T*)NC_listmap_get(&grptwo->type,norm_name);
+      /* Extract the type by name from the group's type list */
+      type = (NC_TYPE_INFO_T*)ncindexlookup(grptwo->type,norm_name);
       if(type != NULL) {
 	if(typeidp) *typeidp = type->hdr.id;
 	break;
@@ -223,10 +223,10 @@ NC4_inq_typeids(int ncid, int *ntypes, int *typeids)
    assert(h5 && grp);
 
    /* Count types. */
-   num = (int)NC_listmap_size(&grp->type);
-   for(i=0;i<num;i++) {
+   num = (int)ncindexsize(grp->type);
+   for(i=NC_FIRSTUSERTYPEID;i<num;i++) {
       NC_TYPE_INFO_T *type;
-      type = NC_listmap_ith(&grp->type,i);
+      type = ncindexith(grp->type,i);
       if(typeids)
 	    typeids[i] = type->hdr.id;
    }
@@ -361,7 +361,7 @@ NC4_inq_type(int ncid, nc_type typeid1, char *name, size_t *size)
       return retval;
    
    /* Find this type. */
-   if (!(type = nclistget(grp->nc4_info->alltypes, typeid1)))
+   if (!(type = ncindexith(grp->nc4_info->alltypes, typeid1)))
       return NC_EBADTYPE;
 
    if (name)
@@ -516,16 +516,16 @@ NC4_inq_user_type(int ncid, nc_type typeid1, char *name, size_t *size,
       return retval;
    
    /* Find this type. */
-   if (!(type = nclistget(grp->nc4_info->alltypes, typeid1)))
+   if (!(type = ncindexith(grp->nc4_info->alltypes, typeid1)))
       return NC_EBADTYPE;
 
    /* Count the number of fields. */
    if (nfieldsp)
    {
       if (type->nc_type_class == NC_COMPOUND)
-         *nfieldsp = nclistlength(type->u.c.fields);
+         *nfieldsp = ncindexsize(type->u.c.fields);
       else if (type->nc_type_class == NC_ENUM)
-	 *nfieldsp = nclistlength(type->u.e.members);
+	 *nfieldsp = ncindexsize(type->u.e.members);
       else
 	 *nfieldsp = 0;
    }
@@ -595,12 +595,12 @@ NC4_inq_compound_field(int ncid, nc_type typeid1, int fieldid, char *name,
       return retval;
    
    /* Find this type. */
-   if (!(type = nclistget(grp->nc4_info->alltypes, typeid1)))
+   if (!(type = ncindexith(grp->nc4_info->alltypes, typeid1)))
       return NC_EBADTYPE;
 
    /* Find the field. */
-   for(i=0;i<nclistlength(type->u.c.fields);i++) {
-      field = nclistget(type->u.c.fields,i);
+   for(i=0;i<ncindexsize(type->u.c.fields);i++) {
+      field = ncindexith(type->u.c.fields,i);
       if (field->hdr.id == fieldid)
       {
 	 if (name)
@@ -691,8 +691,8 @@ NC4_inq_compound_fieldindex(int ncid, nc_type typeid1, const char *name, int *fi
       return retval;
 
    /* Find the field with this name. We assume ok to do linear search */
-   for(i=0;i<nclistlength(type->u.c.fields);i++) {
-      field = nclistget(type->u.c.fields,i);
+   for(i=0;i<ncindexsize(type->u.c.fields);i++) {
+      field = ncindexith(type->u.c.fields,i);
       if (!strcmp(field->hdr.name, norm_name))
 	 break;
    }
@@ -805,7 +805,7 @@ NC4_inq_enum_ident(int ncid, nc_type xtype, long long value, char *identifier)
       return retval;
    
    /* Find this type. */
-   if (!(type = nclistget(grp->nc4_info->alltypes, xtype)))
+   if (!(type = ncindexith(grp->nc4_info->alltypes, xtype)))
       return NC_EBADTYPE;
    
    /* Complain if they are confused about the type. */
@@ -813,9 +813,9 @@ NC4_inq_enum_ident(int ncid, nc_type xtype, long long value, char *identifier)
       return NC_EBADTYPE;
    
    /* Move to the desired enum member in the list. */
-   for(i=0;i<nclistlength(type->u.e.members);i++)
+   for(i=0;i<ncindexsize(type->u.e.members);i++)
    {
-      enum_member = nclistget(type->u.e.members,i);
+      enum_member = ncindexith(type->u.e.members,i);
       switch (type->u.e.base_nc_typeid)
       {
 	 case NC_BYTE:
@@ -853,7 +853,7 @@ NC4_inq_enum_ident(int ncid, nc_type xtype, long long value, char *identifier)
    }
 
    /* If we didn't find it, life sucks for us. :-( */
-   if (i == nclistlength(type->u.e.members))
+   if (i == ncindexsize(type->u.e.members))
       return NC_EINVAL;
 
    return NC_NOERR;
@@ -891,7 +891,7 @@ NC4_inq_enum_member(int ncid, nc_type typeid1, int idx, char *identifier,
       return retval;
    
    /* Find this type. */
-   if (!(type = nclistget(grp->nc4_info->alltypes, typeid1)))
+   if (!(type = ncindexith(grp->nc4_info->alltypes, typeid1)))
       return NC_EBADTYPE;
    
    /* Complain if they are confused about the type. */
@@ -899,11 +899,11 @@ NC4_inq_enum_member(int ncid, nc_type typeid1, int idx, char *identifier,
       return NC_EBADTYPE;
    
    /* Check hdr. */
-   if (idx < 0 || idx >= nclistlength(type->u.e.members))
+   if (idx < 0 || idx >= ncindexsize(type->u.e.members))
       return NC_EINVAL;
    
    /* Move to the desired enum member in the list. */
-   enum_member = nclistget(type->u.e.members,idx);
+   enum_member = ncindexith(type->u.e.members,idx);
 
    /* Give the people what they want. */
    if (identifier)
@@ -1021,3 +1021,37 @@ NC4_get_vlen_element(int ncid, int typeid1, const void *vlen_element,
    return NC_NOERR;
 }
 
+/*
+Create NC_TYPE_INFO_T* objects for atomic types.
+Also, pad the h5->alltypes list with NULLs
+to move to FIRSTUSERTYPEID
+*/
+int
+nc4_init_type_vector(NC_HDF5_FILE_INFO_T* h5)
+{
+    int ret = NC_NOERR;
+    nc_type i;
+    NC_TYPE_INFO_T* typ = NULL;
+
+    nc4_init_native_type_ids();
+
+    h5->alltypes = ncindexnew();
+    ncindexadd(h5->alltypes,NULL); /* NC_NAT */
+    for(i=1;i<=NC_MAX_ATOMIC_TYPE;i++) {
+	size_t len;
+	char name[NC_MAX_NAME+1];
+	strcpy(name,atomic_name[i]);
+        if((ret = nc4_get_typelen_mem(h5,i,0,&len))) goto done;
+	if((ret = nc4_type_new(i,len,name,&typ))) goto done;
+	if((ret = nc4_type_list_add(h5->root_grp,typ))) goto done;
+	if((ret = nc4_set_atomic_type_hdf5_info(h5,typ))) goto done;
+	typ = NULL;
+    }
+    for(i=NC_MAX_ATOMIC_TYPE+1;i<NC_FIRSTUSERTYPEID;i++)
+	ncindexadd(h5->alltypes,NULL);
+done:
+    if(ret != NC_NOERR && typ != NULL) {
+	nc4_type_free(typ);
+    }
+    return ret;
+}

@@ -15,7 +15,7 @@ create other tools.
 #include <string.h>
 #include "netcdf.h"
 #include "ncbytes.h"
-#include "nclist.h"
+#include "ncindex.h"
 
 #undef DEBUG 
 
@@ -37,9 +37,9 @@ typedef struct NCID NCID;
 
 typedef struct NC4printer {
     NCbytes* out;
-    NClist* types;
-    NClist* dims;
-    NClist* allnodes;
+    NCindex* types;
+    NCindex* dims;
+    NCindex* allnodes;
     NCbytes* tmp1;
     NCbytes* tmp2;
 } NC4printer;
@@ -79,9 +79,9 @@ union NUMVALUE {
 #define CAT(x) ncbytescat(out->out,x)
 #define INDENT(x) indent(out,x)
 
-#define hasMetadata(node) (nclistlength(node->attributes) > 0)
-#define hasMaps(var) (nclistlength(node->maps) > 0)
-#define hasDimensions(var) (nclistlength(node->dimrefs) > 0)
+#define hasMetadata(node) (ncindexsize(node->attributes) > 0)
+#define hasMaps(var) (ncindexsize(node->maps) > 0)
+#define hasDimensions(var) (ncindexsize(node->dimrefs) > 0)
 
 static void track(NC4printer* out, NCID* node);
 
@@ -125,9 +125,9 @@ NC4print(NCbytes* buf, int ncid)
     out->out = buf;
     out->tmp1 = ncbytesnew();
     out->tmp2 = ncbytesnew();
-    out->allnodes = nclistnew();
-    out->types = nclistnew();
-    out->dims = nclistnew();
+    out->allnodes = ncindexnew();
+    out->types = ncindexnew();
+    out->dims = ncindexnew();
 
     MAKEID(root,GROUP,NULL,ncid);
 	root->group.isroot = 1;
@@ -151,12 +151,12 @@ freeNC4Printer(NC4printer* out)
     if(out == NULL) return;    
 
 #ifdef DEBUG
-fprintf(stderr,"free: |allnodes=%ld\n",nclistlength(out->allnodes));
+fprintf(stderr,"free: |allnodes=%ld\n",ncindexsize(out->allnodes));
 fflush(stderr);
 #endif
 
-    for(i=0;i<nclistlength(out->allnodes);i++) {
-	NCID* node = (NCID*)nclistget(out->allnodes,i);
+    for(i=0;i<ncindexsize(out->allnodes);i++) {
+	NCID* node = (NCID*)ncindexith(out->allnodes,i);
 #ifdef DEBUG
 fprintf(stderr,"free: node=%lx\n",(unsigned long)node);
 fflush(stderr);
@@ -166,9 +166,9 @@ fflush(stderr);
 
     ncbytesfree(out->tmp1);
     ncbytesfree(out->tmp2);
-    nclistfree(out->types);
-    nclistfree(out->dims);
-    nclistfree(out->allnodes);
+    ncindexfree(out->types);
+    ncindexfree(out->dims);
+    ncindexfree(out->allnodes);
 
     free(out);
 }
@@ -612,17 +612,17 @@ getNumericValue(union NUMVALUE numvalue, nc_type base)
 static NCID*
 findType(NC4printer* out, nc_type t)
 {
-    int len = nclistlength(out->types);
+    int len = ncindexsize(out->types);
     if(t >= len)
 	abort();
-    return (NCID*)nclistget(out->types,t);
+    return (NCID*)ncindexith(out->types,t);
 }
 
 static NCID*
 findDim(NC4printer* out, int dimid)
 {
-    if(nclistlength(out->dims) <= dimid) abort();
-    return (NCID*)nclistget(out->dims,dimid);
+    if(ncindexsize(out->dims) <= dimid) abort();
+    return (NCID*)ncindexith(out->dims,dimid);
 }
 
 static void
@@ -656,19 +656,19 @@ record(NC4printer* out, NCID* node)
 {
     switch (node->sort) {
     case DIM:
-	if(nclistlength(out->dims) <= node->id) {
-            nclistsetalloc(out->dims,node->id+1);
-	    nclistsetlength(out->dims,node->id+1);
+	if(ncindexsize(out->dims) <= node->id) {
+            ncindexsetalloc(out->dims,node->id+1);
+	    ncindexsetlength(out->dims,node->id+1);
 	}
-        nclistset(out->dims,node->id,node);
+        ncindexset(out->dims,node->id,node);
         break;
     case ATOMTYPE:
     case USERTYPE:
-	if(nclistlength(out->types) <= node->id) {
-            nclistsetalloc(out->types,node->id+1);
-	    nclistsetlength(out->types,node->id+1);
+	if(ncindexsize(out->types) <= node->id) {
+            ncindexsetalloc(out->types,node->id+1);
+	    ncindexsetlength(out->types,node->id+1);
 	}
-        nclistset(out->types,node->id,node);
+        ncindexset(out->types,node->id,node);
         break;
     default: break;
     }
@@ -682,9 +682,9 @@ track(NC4printer* out, NCID* node)
 #ifdef DEBUG
     fprintf(stderr,"track: node=%lx\n",(unsigned long)node);
 #endif
-    nclistpush(out->allnodes,node);
+    ncindexadd(out->allnodes,node);
 #ifdef DEBUG
-    fprintf(stderr,"track: |allnodes|=%ld\n",nclistlength(out->allnodes));
+    fprintf(stderr,"track: |allnodes|=%ld\n",ncindexsize(out->allnodes));
     fflush(stderr);
 #endif
 }

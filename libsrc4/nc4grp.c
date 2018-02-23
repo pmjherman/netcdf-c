@@ -233,7 +233,7 @@ NC4_inq_grps(int ncid, int *numgrps, int *ncids)
       int i;
       for(i=0;i<num;i++) {
          NC_GRP_INFO_T *g;
-	 g = ncindexith(grp->children,i);
+	 g = (NC_GRP_INFO_T*)ncindexith(grp->children,i);
 	 /* Combine the hdr.id in a bitwise or with the ext_ncid,
 	  * which allows the returned ncid to carry both file and
 	  * group information. */
@@ -493,7 +493,7 @@ NC4_inq_varids(int ncid, int *nvars, int *varids)
       int i;
       for(i=0;i<num_vars;i++) {
          NC_VAR_INFO_T *var;
-         var = ncindexith(grp->vars,i);
+         var = (NC_VAR_INFO_T*)ncindexith(grp->vars,i);
          if (!var) continue;
          varids[i] = var->hdr.id;
       }
@@ -575,7 +575,7 @@ NC4_inq_dimids(int ncid, int *ndims, int *dimids, int include_parents)
          for(i=0;i<localn;i++) {
 	    for(i=0;i<localn;i++) {
                NC_DIM_INFO_T *dim;
-	       dim = ncindexith(g->dim,i);
+	       dim = (NC_DIM_INFO_T*)ncindexith(g->dim,i);
                dimids[globaln++] = dim->hdr.id;
             }
 	 }

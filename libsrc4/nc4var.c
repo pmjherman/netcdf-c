@@ -408,7 +408,7 @@ int
 nc4_vararray_add(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var)
 {
   if(grp->vars == NULL) {
-	if((grp->vars = ncindexnew())==NULL) return NC_ENOMEM;
+	if((grp->vars = ncindexnew(0))==NULL) return NC_ENOMEM;
   }
   if(grp == NULL || var == NULL)
       return NC_EINVAL;
@@ -523,65 +523,13 @@ NC4_def_var(int ncid, const char *name, nc_type xtype,
 #endif
 
    /* If this is a user-defined type, there is a type_info struct with
-    * all the type information. For atomic types, fake up a type_info
-    * struct. */
-   if (xtype <= NC_STRING)
-   {
-#if 1
-      type_info = nclistget(h5->alltypes,xtype);       
-#else
-      if (!(type_info = calloc(1, sizeof(NC_TYPE_INFO_T))))
-         BAIL(NC_ENOMEM);
-      type_info->hdr.id = xtype;
-      type_info->endianness = NC_ENDIAN_NATIVE;
-      if ((retval = nc4_get_hdf_typeid(h5, xtype, &type_info->hdf_typeid,
-                                       type_info->endianness)))
-         BAIL(retval);
-      if ((type_info->native_hdf_typeid = H5Tget_native_type(type_info->hdf_typeid,
-                                                             H5T_DIR_DEFAULT)) < 0)
-         BAIL(NC_EHDFERR);
-      if ((retval = nc4_get_typelen_mem(h5, type_info->hdr.id, 0,
-                                        &type_info->size)))
-         BAIL(retval);
-
-      /* Set the "class" of the type */
-      if (xtype == NC_CHAR)
-         type_info->nc_type_class = NC_CHAR;
-      else
-      {
-         H5T_class_t class;
-
-         if ((class = H5Tget_class(type_info->hdf_typeid)) < 0)
-            BAIL(NC_EHDFERR);
-         switch(class)
-         {
-         case H5T_STRING:
-            type_info->nc_type_class = NC_STRING;
-            break;
-
-         case H5T_INTEGER:
-            type_info->nc_type_class = NC_INT;
-            break;
-
-         case H5T_FLOAT:
-            type_info->nc_type_class = NC_FLOAT;
-            break;
-
-         default:
-            BAIL(NC_EBADTYPID);
-         }
-      }
-#endif
-   }
-   /* If this is a user defined type, find it. */
-   else
-   {
-      if (nc4_find_type(grp->nc4_info, xtype, &type_info))
-         BAIL(NC_EBADTYPE);
-   }
+    * all the type information. For atomic types, one also exists
+    */
+   if(nc4_find_any_type(grp->nc4_info, xtype, &type_info))
+         BAIL(NC_EBADTYPE);	
 
    /* Create a new var and fill in some HDF5 cache setting values. */
-   if ((retval = nc4_var_new(norm_name,ndims,&var)))
+   if ((retval = nc4_var_new(norm_name,type_info,ndims,&var)))
       BAIL(retval);
 
    /* Now fill in the values in the var info structure. */
@@ -592,11 +540,6 @@ NC4_def_var(int ncid, const char *name, nc_type xtype,
    /* Add a var to the variable array, growing it as needed. */
    if ((retval = nc4_vararray_add(grp, var)))
       BAIL(retval);
-
-   /* Point to the type, and increment its ref. count */
-   var->type_info = type_info;
-   var->type_info->rc++;
-   type_info = NULL;
 
    /* Allocate space for dimension information. */
    if (ndims)
@@ -717,9 +660,6 @@ NC4_def_var(int ncid, const char *name, nc_type xtype,
    LOG((4, "new varid %d", var->hdr.id));
 
 exit:
-   if (type_info)
-      if ((retval = nc4_type_free(type_info)))
-         BAIL2(retval);
 
    return retval;
 }

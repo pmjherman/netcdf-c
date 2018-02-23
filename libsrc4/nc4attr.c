@@ -16,9 +16,9 @@
  * @author Ed Hartnett
  */
 #include "nc.h"
+#include "nc4internal.h"
 #include "ncdispatch.h"
 #include "nc4dispatch.h"
-#include "nc4internal.h"
 
 int nc4typelen(nc_type type);
 
@@ -163,22 +163,22 @@ nc4_get_att(int ncid, int varid, const char *name, nc_type *xtype,
    /* If mem_type is NC_NAT, it means we want to use the attribute's
     * file type as the mem type as well. */
    if (mem_type == NC_NAT)
-      mem_type = att->nc_typeid;
+      mem_type = att->type->hdr.id;
 
    /* If the attribute is NC_CHAR, and the mem_type isn't, or vice
     * versa, that's a freakish attempt to convert text to
     * numbers. Some pervert out there is trying to pull a fast one!
     * Send him an NC_ECHAR error. */
    if (data && att->len)
-      if ((att->nc_typeid == NC_CHAR && mem_type != NC_CHAR) ||
-           (att->nc_typeid != NC_CHAR && mem_type == NC_CHAR))
+      if ((att->type->hdr.id == NC_CHAR && mem_type != NC_CHAR) ||
+           (att->type->hdr.id != NC_CHAR && mem_type == NC_CHAR))
          BAIL(NC_ECHAR); /* take that, you freak! */
 
    /* Copy the info. */
    if (lenp)
       *lenp = att->len;
    if (xtype)
-      *xtype = att->nc_typeid;
+      *xtype = att->type->hdr.id;
    if (attnum) {
       *attnum = att->hdr.id;
    }
@@ -194,15 +194,15 @@ nc4_get_att(int ncid, int varid, const char *name, nc_type *xtype,
    /* We may have to convert data. Treat NC_CHAR the same as
     * NC_UBYTE. If the mem_type is NAT, don't try any conversion - use
     * the attribute's type. */
-   if (data && att->len && mem_type != att->nc_typeid &&
+   if (data && att->len && mem_type != att->type->hdr.id &&
        mem_type != NC_NAT &&
        !(mem_type == NC_CHAR &&
-         (att->nc_typeid == NC_UBYTE || att->nc_typeid == NC_BYTE)))
+         (att->type->hdr.id == NC_UBYTE || att->type->hdr.id == NC_BYTE)))
    {
       if (!(bufr = malloc((size_t)(att->len * type_size))))
          BAIL(NC_ENOMEM);
       need_to_convert++;
-      if ((retval = nc4_convert_type(att->data, bufr, att->nc_typeid,
+      if ((retval = nc4_convert_type(att->data, bufr, att->type->hdr.id,
                                      mem_type, (size_t)att->len, &range_error,
                                      NULL, (h5->cmode & NC_CLASSIC_MODEL), 0, 0)))
          BAIL(retval);
@@ -210,7 +210,7 @@ nc4_get_att(int ncid, int varid, const char *name, nc_type *xtype,
       /* For strict netcdf-3 rules, ignore erange errors between UBYTE
        * and BYTE types. */
       if ((h5->cmode & NC_CLASSIC_MODEL) &&
-          (att->nc_typeid == NC_UBYTE || att->nc_typeid == NC_BYTE) &&
+          (att->type->hdr.id == NC_UBYTE || att->type->hdr.id == NC_BYTE) &&
           (mem_type == NC_UBYTE || mem_type == NC_BYTE) &&
           range_error)
          range_error = 0;
@@ -233,11 +233,11 @@ nc4_get_att(int ncid, int varid, const char *name, nc_type *xtype,
          NC_TYPE_INFO_T *type;
 
          /* Get the type object for the attribute's type */
-         if ((retval = nc4_find_type(h5, att->nc_typeid, &type)))
+         if ((retval = nc4_find_type(h5, att->type->hdr.id, &type)))
             BAIL(retval);
 
          /* Retrieve the size of the base type */
-         if ((retval = nc4_get_typelen_mem(h5, type->u.v.base_nc_typeid, 0, &base_typelen)))
+         if ((retval = nc4_get_typelen_mem(h5, type->u.v.base_type->hdr.id, 0, &base_typelen)))
             BAIL(retval);
 
          for (i = 0; i < att->len; i++)
@@ -602,6 +602,7 @@ NC4_put_att(int ncid, int varid, const char *name, nc_type file_type,
    size_t type_size;
    int i;
    int ret;
+   NC_TYPE_INFO_T* type = NULL;
 
    /* Find info for this file, group, and h5 info. */
    if ((ret = nc4_find_nc_grp_h5(ncid, &nc, &grp, &h5)))
@@ -672,7 +673,7 @@ NC4_put_att(int ncid, int varid, const char *name, nc_type file_type,
       /* For an existing att, if we're not in define mode, the len
          must not be greater than the existing len for classic model. */
       if (!(h5->flags & NC_INDEF) &&
-          len * nc4typelen(file_type) > (size_t)att->len * nc4typelen(att->nc_typeid))
+          len * nc4typelen(file_type) > (size_t)att->len * nc4typelen(att->type->hdr.id))
       {
          if (h5->cmode & NC_CLASSIC_MODEL)
             return NC_EINDEFINE;
@@ -700,22 +701,23 @@ NC4_put_att(int ncid, int varid, const char *name, nc_type file_type,
    if (h5->cmode & NC_CLASSIC_MODEL && file_type > NC_DOUBLE)
       return NC_ESTRICTNC3;
 
+   /* Locate the actual type object */
+   if((ret=nc4_find_any_type(h5,file_type,&type)))
+	BAIL(ret);
+
    /* Add to the end of the attribute list, if this att doesn't
       already exist. */
    if (new_att)
    {
       LOG((3, "adding attribute %s to the list...", norm_name));
-      if ((ret = nc4_att_new(norm_name, &att)))
+      if ((ret = nc4_att_new(norm_name, type, &att)))
          BAIL (ret);
       if ((ret = nc4_att_list_add(attlist, att)))
          BAIL (ret);
-         if (!(att->hdr.name = strdup(norm_name)))
-         return NC_ENOMEM;
    }
 
    /* Now fill in the metadata. */
    att->dirty = NC_TRUE;
-   att->nc_typeid = file_type;
 
    /* If this att has vlen or string data, release it before we lose the length value. */
    if (att->stdata)
@@ -744,7 +746,7 @@ NC4_put_att(int ncid, int varid, const char *name, nc_type file_type,
       int size;
 
       /* Fill value must be same type and have exactly one value */
-      if (att->nc_typeid != var->type_info->hdr.id)
+      if (att->type->hdr.id != var->type_info->hdr.id)
          return NC_EBADTYPE;
       if (att->len != 1)
          return NC_EINVAL;
@@ -840,7 +842,7 @@ NC4_put_att(int ncid, int varid, const char *name, nc_type file_type,
             BAIL(retval);
 
          /* Retrieve the size of the base type */
-         if ((retval = nc4_get_typelen_mem(h5, type->u.v.base_nc_typeid, 0, &base_typelen)))
+         if ((retval = nc4_get_typelen_mem(h5, type->u.v.base_type->hdr.id, 0, &base_typelen)))
             BAIL(retval);
 
          vldata1 = data;

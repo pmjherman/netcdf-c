@@ -53,7 +53,7 @@ int optind;
 #endif
 
 #if !defined(HAVE_SSIZE_T) && !defined(H5_SIZEOF_SSIZE_T)
-typedef int ssize_t;
+typedef long ssize_t;
 #endif
 
 #define XML_VERSION "1.0"

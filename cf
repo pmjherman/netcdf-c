@@ -93,7 +93,6 @@ fi
 CXXFLAGS="$CPPFLAGS $CXXFLAGS"
 
 FLAGS="--prefix ${PREFIX}"
-FLAGS="$FLAGS --enable-libsrc4x"
 #FLAGS="$FLAGS --disable-cxx"
 #FLAGS="$FLAGS --disable-examples"
 #FLAGS="$FLAGS --disable-utilities"

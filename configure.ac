@@ -1316,11 +1316,21 @@ AC_MSG_WARN([netCDF-4 disabled => --disable-filter-testing])
 enable_filter_testing = no
 fi
 
+# Temporary: Control new libsrc4x code
+AC_MSG_CHECKING([whether new libsrc4x code should be used])
+AC_ARG_ENABLE([libsrc4x],
+              [AS_HELP_STRING([--enable-libsrc4x],
+                              [Use libsrc4x instead of libsrc4])])
+test "x$enable_libsrc4x" = xyes || enable_libsrc4x=no
+AC_MSG_RESULT($enable_libsrc4x)
+
 if test "x$enable_shared" = xno ; then
 AC_MSG_WARN([Shared libraries are disabled => --disable-filter-testing])
 enable_filter_testing = no
 fi
 AM_CONDITIONAL(ENABLE_FILTER_TESTING, [test x$enable_filter_testing = xyes])
+
+AM_CONDITIONAL(ENABLE_LIBSRC4X, [test x$enable_libsrc4x = xyes])
 
 AC_SUBST(NC_LIBS,[$NC_LIBS])
 AC_SUBST(HAS_DAP,[$enable_dap])
@@ -1441,6 +1451,7 @@ AC_CONFIG_FILES([Makefile
                  h5_test/Makefile
                  libsrc/Makefile
                  libsrc4/Makefile
+                 libsrc4x/Makefile
                  libsrcp/Makefile
                  ncdump/Makefile
                  ncgen3/Makefile

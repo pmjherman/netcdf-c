@@ -41,7 +41,11 @@ endif
 # Is the user building netCDF-4?
 if USE_NETCDF4
 H5_TEST_DIR = h5_test
+if ENABLE_LIBSRC4X
+LIBSRC4_DIR = libsrc4x
+else
 LIBSRC4_DIR = libsrc4
+endif
 NC_TEST4 = nc_test4
 endif
 

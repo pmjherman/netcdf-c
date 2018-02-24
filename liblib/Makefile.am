@@ -61,12 +61,13 @@ endif # ENABLE_DAP4
 # NetCDF-4 ...
 if USE_NETCDF4
 
+if ENABLE_LIBSRC4X
+AM_CPPFLAGS += -I${top_srcdir}/libsrc4x
+libnetcdf_la_LIBADD += ${top_builddir}/libsrc4x/libnetcdf4.la
+else
 AM_CPPFLAGS += -I${top_srcdir}/libsrc4
-
 libnetcdf_la_LIBADD += ${top_builddir}/libsrc4/libnetcdf4.la
-
-# Not ready for prime time yet
-# libnetcdf_la_LIBADD += ${top_builddir}/libdiskless/libdiskless.la
+endif
 
 endif #USE_NETCDF4
 

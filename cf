@@ -1,6 +1,6 @@
 #!/bin/bash
 #NB=1
-DB=1
+#DB=1
 #X=-x
 FAST=1
 #PROF=1
@@ -93,7 +93,7 @@ fi
 CXXFLAGS="$CPPFLAGS $CXXFLAGS"
 
 FLAGS="--prefix ${PREFIX}"
-#FLAGS="$FLAGS --disable-f77 --disable-f90"
+FLAGS="$FLAGS --enable-libsrc4x"
 #FLAGS="$FLAGS --disable-cxx"
 #FLAGS="$FLAGS --disable-examples"
 #FLAGS="$FLAGS --disable-utilities"

@@ -12,8 +12,7 @@
  * @author Ed Hartnett
  */
 
-#include "nc4internal.h"
-#include "nc4dispatch.h"
+#include "includes4.h"
 
 /**
  * @internal Netcdf-4 files might have more than one unlimited
@@ -52,18 +51,19 @@ NC4_inq_unlimdim(int ncid, int *unlimdimidp)
       *unlimdimidp = -1;
       for (g = grp; g && !found; g = g->parent)
       {
-         for (dim = g->dim; dim; dim = dim->l.next)
-         {
-            if (dim->unlimited)
-            {
-               *unlimdimidp = dim->dimid;
-               found++;
-               break;
-            }
-         }
-      }
+          int k;
+          size_t count = ncindexsize(g->dim);
+	  /* Walk the dimension vector */
+          for(k=0;k<count;k++) {
+	      dim = (NC_DIM_INFO_T*)ncindexith(g->dim,k);
+              if (dim->unlimited) {
+	          *unlimdimidp = dim->hdr.id;
+	          found++;
+	          break;
+	      }
+           }
+       }
    }
-
    return NC_NOERR;
 }
 
@@ -99,7 +99,6 @@ NC4_def_dim(int ncid, const char *name, size_t len, int *idp)
    NC_DIM_INFO_T *dim;
    char norm_name[NC_MAX_NAME + 1];
    int retval = NC_NOERR;
-   uint32_t nn_hash;
 
    LOG((2, "%s: ncid 0x%x name %s len %d", __func__, ncid, name,
         (int)len));
@@ -117,12 +116,16 @@ NC4_def_dim(int ncid, const char *name, size_t len, int *idp)
    if (h5->cmode & NC_CLASSIC_MODEL)
    {
       /* Only one limited dimenson for strict nc3. */
-      if (len == NC_UNLIMITED)
-         for (dim = grp->dim; dim; dim = dim->l.next)
-            if (dim->unlimited)
-               return NC_EUNLIMIT;
-
-      /* Must be in define mode for stict nc3. */
+      if (len == NC_UNLIMITED) {
+	int k;
+	size_t count = ncindexsize(grp->dim);
+	for(k=0;k<count;k++) {
+	    dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,k);
+	    if (dim->unlimited)
+	       return NC_EUNLIMIT;
+        }
+      }
+      /* Must be in define mode for strict nc3. */
       if (!(h5->flags & NC_INDEF))
          return NC_ENOTINDEFINE;
    }
@@ -137,13 +140,10 @@ NC4_def_dim(int ncid, const char *name, size_t len, int *idp)
       if(len > X_UINT_MAX) /* Backward compat */
          return NC_EDIMSIZE;
 
-   /* Create a hash of the name. */
-   nn_hash = hash_fast(norm_name, strlen(norm_name));
-
    /* Make sure the name is not already in use. */
-   for (dim = grp->dim; dim; dim = dim->l.next)
-      if (nn_hash == dim->hash && !strncmp(dim->name, norm_name, NC_MAX_NAME))
-         return NC_ENAMEINUSE;
+   dim = (NC_DIM_INFO_T*)ncindexlookup(grp->dim,norm_name);
+   if(dim != NULL)
+       return NC_ENAMEINUSE;
 
    /* If it's not in define mode, enter define mode. Do this only
     * after checking all input data, so we only enter define mode if
@@ -154,22 +154,19 @@ NC4_def_dim(int ncid, const char *name, size_t len, int *idp)
 
    /* Add a dimension to the list. The ID must come from the file
     * information, since dimids are visible in more than one group. */
-   if ((retval = nc4_dim_list_add(&grp->dim, &dim)))
+   if((retval = nc4_dim_new(norm_name, &dim)))
+	return retval;
+   if ((retval = nc4_dim_list_add(grp, dim)))
       return retval;
-   dim->dimid = grp->nc4_info->next_dimid++;
 
-   /* Initialize the metadata for this dimension. */
-   if (!(dim->name = strdup(norm_name)))
-      return NC_ENOMEM;
+   /* Initialize the other metadata for this dimension. */
    dim->len = len;
    if (len == NC_UNLIMITED)
       dim->unlimited = NC_TRUE;
 
-   dim->hash = nn_hash;
-
    /* Pass back the dimid. */
    if (idp)
-      *idp = dim->dimid;
+      *idp = dim->hdr.id;
 
    return retval;
 }
@@ -197,7 +194,6 @@ NC4_inq_dimid(int ncid, const char *name, int *idp)
    char norm_name[NC_MAX_NAME + 1];
    int finished = 0;
    int retval;
-   uint32_t shash;
 
    LOG((2, "%s: ncid 0x%x name %s", __func__, ncid, name));
 
@@ -214,18 +210,15 @@ NC4_inq_dimid(int ncid, const char *name, int *idp)
    if ((retval = nc4_normalize_name(name, norm_name)))
       return retval;
 
-   shash = hash_fast(norm_name, strlen(norm_name));
-
-   /* Go through each dim and check for a name match. */
-   for (g = grp; g && !finished; g = g->parent)
-      for (dim = g->dim; dim; dim = dim->l.next)
-         if (dim->hash == shash && !strncmp(dim->name, norm_name, NC_MAX_NAME))
-         {
+   /* Recurse upward and check for a name match. */
+   for (g = grp; g && !finished; g = g->parent) {
+      dim = (NC_DIM_INFO_T*)ncindexlookup(g->dim,norm_name);
+      if(dim != NULL) {/* found it */
             if (idp)
-               *idp = dim->dimid;
+               *idp = dim->hdr.id;
             return NC_NOERR;
-         }
-
+      }
+   }
    return NC_EBADDIM;
 }
 
@@ -267,8 +260,8 @@ NC4_inq_dim(int ncid, int dimid, char *name, size_t *lenp)
    assert(dim);
 
    /* Return the dimension name, if the caller wants it. */
-   if (name && dim->name)
-      strcpy(name, dim->name);
+   if (name && dim->hdr.name)
+      strcpy(name, dim->hdr.name);
 
    /* Return the dimension length, if the caller wants it. */
    if (lenp)
@@ -347,24 +340,25 @@ NC4_rename_dim(int ncid, int dimid, const char *name)
       return retval;
 
    /* Check if name is in use, and retain a pointer to the correct dim */
-   tmp_dim = NULL;
-   for (dim = grp->dim; dim; dim = dim->l.next)
-   {
-      if (!strncmp(dim->name, norm_name, NC_MAX_NAME))
-         return NC_ENAMEINUSE;
-      if (dim->dimid == dimid)
-         tmp_dim = dim;
-   }
-   if (!tmp_dim)
-      return NC_EBADDIM;
-   dim = tmp_dim;
+   tmp_dim = (NC_DIM_INFO_T*)ncindexlookup(grp->dim, norm_name);
+   if(tmp_dim != NULL)
+     return NC_ENAMEINUSE; /* Dim with that new name already defined in group */
+
+   /* Get the dim to be renamed */
+   dim = nclistget(h5->alldims,dimid);   
+   if(dim == NULL)
+	return NC_EBADDIM; /* no such dim */
+   /* Make sure this dim is within this grp */
+   tmp_dim = (NC_DIM_INFO_T*)ncindexlookup(grp->dim,dim->hdr.name);
+   if(tmp_dim == NULL || tmp_dim->hdr.id != dim->hdr.id)
+      return NC_EBADDIM; /* this should never happen, but better safe...*/
 
    /* Check for renaming dimension w/o variable */
    if (dim->hdf_dimscaleid)
    {
       /* Sanity check */
       assert(!dim->coord_var);
-      LOG((3, "dim %s is a dim without variable", dim->name));
+      LOG((3, "dim %s is a dim without variable", dim->hdr.name));
 
       /* Delete the dimscale-only dataset. */
       if ((retval = delete_existing_dimscale_dataset(grp, dimid, dim)))
@@ -373,17 +367,14 @@ NC4_rename_dim(int ncid, int dimid, const char *name)
 
    /* Give the dimension its new name in metadata. UTF8 normalization
     * has been done. */
-   assert(dim->name);
-   free(dim->name);
-   if (!(dim->name = malloc((strlen(norm_name) + 1) * sizeof(char))))
+   assert(dim->hdr.name);
+   free(dim->hdr.name);
+   if((dim->hdr.name = strdup(norm_name)) == NULL)
       return NC_ENOMEM;
-   strcpy(dim->name, norm_name);
-   dim->hash = hash_fast(norm_name, strlen(norm_name));
-   LOG((3, "dim is now named %s", dim->name));
 
    /* Check if dimension was a coordinate variable, but names are
     * different now */
-   if (dim->coord_var && strcmp(dim->name, dim->coord_var->name))
+   if (dim->coord_var && strcmp(dim->hdr.name, dim->coord_var->hdr.name))
    {
       /* Break up the coordinate variable */
       if ((retval = nc4_break_coord_var(grp, dim->coord_var, dim)))
@@ -397,15 +388,15 @@ NC4_rename_dim(int ncid, int dimid, const char *name)
 
       /* Attempt to find a variable with the same name as the
        * dimension in the current group. */
-      if ((retval = nc4_find_var(grp, dim->name, &var)))
+      if ((retval = nc4_find_var(grp, dim->hdr.name, &var)))
          return retval;
 
       /* Check if we found a variable and the variable has the
        * dimension in index 0. */
-      if (var && var->dim[0] == dim)
+      if (var && var->dim.dims[0] == dim)
       {
          /* Sanity check */
-         assert(var->dimids[0] == dim->dimid);
+         assert(var->dim.dimids[0] == dim->hdr.id);
 
          /* Reform the coordinate variable. */
          if ((retval = nc4_reform_coord_var(grp, var, dim)))
@@ -451,14 +442,16 @@ NC4_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
    /* Get our dim info. */
    assert(h5);
    {
-      for (dim=grp->dim; dim; dim=dim->l.next)
-      {
-         if (dim->unlimited)
-         {
-            if (unlimdimidsp)
-               unlimdimidsp[num_unlim] = dim->dimid;
-            num_unlim++;
-         }
+      int k;
+      int count = ncindexsize(grp->dim);
+      for(k=0;k<count;k++) {
+         dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,k);
+	 if (dim->unlimited)
+	 {
+	    if (unlimdimidsp)
+	       unlimdimidsp[num_unlim] = dim->hdr.id;
+	    num_unlim++;
+	 }
       }
    }
 

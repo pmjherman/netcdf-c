@@ -39,9 +39,6 @@ NClist* nclistnew(void)
 int
 nclistfree(NClist* l)
 {
-if(((uintptr_t)l) < 1000) {
-int x = 0;
-}
   if(l) {
     l->alloc = 0;
     if(l->content != NULL) {free(l->content); l->content = NULL;}

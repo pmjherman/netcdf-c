@@ -25,8 +25,8 @@ Warning: This code depends critically on the assumption that
 #include <stdint.h>
 #endif
 #include <assert.h>
-#include "ncindex.h"
-#include "nc4internal.h"
+
+#include "includes4.h"
 
 /* Keep the table sizes small initially */
 #define DFALTTABLESIZE 7

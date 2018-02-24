@@ -1937,7 +1937,7 @@ oc_data_mode(OCobject link, OCobject datanode, OCDT* modep)
     OCDEREF(OCdata*,data,datanode);
 
     if(modep) *modep = data->datamode;
-    return OC_OK;
+    return OC_NOERR;
 }
 
 /* Free up a datanode that is no longer being used;

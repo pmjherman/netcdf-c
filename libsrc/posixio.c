@@ -42,7 +42,7 @@
 #endif
 
 #ifndef HAVE_SSIZE_T
-typedef int ssize_t;
+typedef long ssize_t;
 #endif
 
 #ifndef SEEK_SET

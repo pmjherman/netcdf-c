@@ -36,10 +36,6 @@
 #include <stdio.h>
 #endif
 
-#ifndef HAVE_SSIZE_T
-typedef long ssize_t;
-#endif
-
 #ifndef SEEK_SET
 #define SEEK_SET 0
 #define SEEK_CUR 1

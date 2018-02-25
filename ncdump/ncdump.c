@@ -52,10 +52,6 @@ int optind;
 #include "nc4internal.h" /* to get name of the special properties file */
 #endif
 
-#if !defined(HAVE_SSIZE_T) && !defined(H5_SIZEOF_SSIZE_T)
-typedef long ssize_t;
-#endif
-
 #define XML_VERSION "1.0"
 
 #define int64_t long long

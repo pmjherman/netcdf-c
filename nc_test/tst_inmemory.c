@@ -384,7 +384,7 @@ verify_file(int ncid, int modified)
 	int j;
 	int dimcnt = 0;
         int varcnt = 0;
-	CHECK(nc_inq(ncid, &dimcnt, &varcnt, NULL, NULL);
+	CHECK(nc_inq(ncid, &dimcnt, &varcnt, NULL, NULL));
 	for(j=0;j<dimcnt;j++) dimid[j] = j;	
 	for(j=0;j<varcnt;j++) varid[j] = j;	
     }

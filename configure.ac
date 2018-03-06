@@ -171,14 +171,6 @@ if test "x$enable_jna" = xyes ; then
 AC_DEFINE([JNA], [1], [if true, include jna bug workaround code])
 fi
 
-# Does the user want to run extra tests with valgrind?
-AC_MSG_CHECKING([whether extra valgrind tests should be run])
-AC_ARG_ENABLE([valgrind-tests],
-              [AS_HELP_STRING([--enable-valgrind-tests],
-                              [build with valgrind-tests (valgrind is required, static builds only)])])
-test "x$enable_valgrind_tests" = xyes || enable_valgrind_tests=no
-AC_MSG_RESULT($enable_valgrind_tests)
-
 # Does the user want to build netcdf-4?
 AC_MSG_CHECKING([whether we should build netCDF-4])
 AC_ARG_ENABLE([netcdf-4], [AS_HELP_STRING([--disable-netcdf-4],
@@ -208,7 +200,7 @@ AC_ARG_ENABLE([hdf4], [AS_HELP_STRING([--enable-hdf4],
               [build netcdf-4 with HDF4 read capability (HDF4, HDF5 and zlib required)])])
 test "x$enable_hdf4" = xyes || enable_hdf4=no
 if test "x$enable_hdf4" = xyes -a "x$enable_netcdf_4" = xno; then
-      AC_MSG_ERROR([NetCDF-4 is required for HDF4 features])   
+      AC_MSG_ERROR([NetCDF-4 is required for HDF4 features])
 fi
 AC_MSG_RESULT($enable_hdf4)
 
@@ -243,9 +235,8 @@ AC_MSG_RESULT($enable_extra_example_tests)
 AC_MSG_CHECKING([whether parallel IO tests should be run])
 AC_ARG_ENABLE([parallel-tests],
               [AS_HELP_STRING([--enable-parallel-tests],
-                              [Run extra parallel IO tests. Ignored if \
-                               netCDF-4 is not enabled, or built on a system \
-                               without parallel I/O support.])])
+                              [Run extra parallel IO tests. Requires netCDF-4
+                              with parallel I/O support.])])
 test "x$enable_parallel_tests" = xyes || enable_parallel_tests=no
 AC_MSG_RESULT($enable_parallel_tests)
 
@@ -670,14 +661,6 @@ AC_MSG_NOTICE([setting up libtool])
 LT_PREREQ([2.2])
 LT_INIT()
 
-# Valgrind tests don't work with shared builds because of some libtool
-# weirdness.
-if test "x$enable_shared" = xyes; then
-   if test $enable_valgrind_tests = yes; then
-      AC_MSG_ERROR([No valgrind tests with shared libraries])
-   fi
-fi
-
 AC_MSG_NOTICE([finding other utilities])
 
 # Is m4 installed? If not, bail.
@@ -934,7 +917,9 @@ if test "x$enable_netcdf_4" = xyes; then
 
    AC_CHECK_HEADERS([hdf5.h], [], [AC_MSG_ERROR([Compiling a test with HDF5 failed.  Either hdf5.h cannot be found, or config.log should be checked for other reason.])])
    AC_CHECK_FUNCS([H5Z_SZIP])
+   hdf5_parallel=no
 
+   AC_CHECK_FUNCS([H5Pget_fapl_mpiposix H5Pget_fapl_mpio H5Pset_deflate H5Z_SZIP H5free_memory H5Pset_libver_bounds H5Pset_all_coll_metadata_ops])
    # The user may have parallel HDF5 based on MPI POSIX.
    if test "x$ac_cv_func_H5Pget_fapl_mpiposix" = xyes; then
       AC_DEFINE([USE_PARALLEL_POSIX], [1], [if true, compile in parallel netCDF-4 based on MPI/POSIX])
@@ -955,8 +940,17 @@ if test "x$enable_netcdf_4" = xyes; then
    if test "x$ac_cv_func_H5Pget_fapl_mpio" = xyes -o "x$ac_cv_func_H5Pget_fapl_mpiposix" = xyes; then
       hdf5_parallel=yes
    fi
+
    AC_MSG_CHECKING([whether parallel io is enabled in hdf5])
    AC_MSG_RESULT([$hdf5_parallel])
+
+   if test "x$hdf5_parallel" = "xno"; then
+      if test "x$enable_parallel_tests" = "xyes"; then
+         AC_MSG_ERROR([Parallel tests requested, but no parallel HDF5 installation detected.])
+      fi
+   fi
+
+
 
    # The user may have built HDF5 with the SZLIB library.
    enable_szlib=no
@@ -1204,7 +1198,6 @@ AM_CONDITIONAL(USE_SZIP, [test "x$ac_cv_func_H5Z_SZIP" = xyes])
 AM_CONDITIONAL(USE_PNETCDF_DIR, [test ! "x$PNETCDFDIR" = x])
 AM_CONDITIONAL(USE_LOGGING, [test "x$enable_logging" = xyes])
 AM_CONDITIONAL(CROSS_COMPILING, [test "x$cross_compiling" = xyes])
-AM_CONDITIONAL(USE_VALGRIND_TESTS, [test "x$enable_valgrind_tests" = xyes])
 AM_CONDITIONAL(USE_NETCDF4, [test x$enable_netcdf_4 = xyes])
 AM_CONDITIONAL(USE_HDF4, [test x$enable_hdf4 = xyes])
 AM_CONDITIONAL(USE_HDF4_FILE_TESTS, [test x$enable_hdf4_file_tests = xyes])

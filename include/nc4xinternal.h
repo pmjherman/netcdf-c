@@ -38,6 +38,9 @@
 #define GRP_ID_MASK (0x0000ffff)
 #define ID_SHIFT (16)
 
+typedef enum {GET, PUT} NC_PG_T;
+typedef enum {NCNAT, NCVAR, NCDIM, NCATT, NCTYP, NCGRP} NC_SORT;
+
 #define NC_MAX_HDF5_NAME (NC_MAX_NAME + 10)
 #define NC_V2_ERR (-1)
 
@@ -107,12 +110,6 @@
 
 /* Boolean type, to make the code easier to read */
 typedef enum {NC_FALSE = 0, NC_TRUE = 1} nc_bool_t;
-
-typedef enum {GET, PUT} NC_PG_T;
-typedef enum {NCNAT, NCVAR, NCDIM, NCATT, NCTYP, NCGRP} NC_SORT;
-
-typedef hid_t h5native_t;
-typedef hid_t h5file_t;
 
 /*Forward*/
 struct NCFILEINFO;

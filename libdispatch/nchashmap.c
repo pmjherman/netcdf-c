@@ -150,6 +150,14 @@ locate(NC_hashmap* hash, unsigned int hashkey, void* key, size_t keysize, size_t
     return 0;
 }
 
+/* Return the hash key for specified key; takes key+size*/
+/* Wrapper for crc32 */
+unsigned int
+NC_hashmapkey(const void* key, size_t size)
+{
+    return NC_crc32(0,(unsigned char*)key,(unsigned int)size);
+}
+
 NC_hashmap*
 NC_hashmapnew(size_t startsize)
 {
@@ -2067,6 +2075,8 @@ void
 printhashmap(NC_hashmap* hm)
 {
     size_t i;
+    int running;
+
     if(hm == NULL) {fprintf(stderr,"NULL"); fflush(stderr); return;}
     fprintf(stderr,"{size=%lu count=%lu table=0x%lx}\n",
 	(unsigned long)hm->alloc,(unsigned long)hm->active,(unsigned long)((uintptr_t)hm->table));
@@ -2074,16 +2084,23 @@ printhashmap(NC_hashmap* hm)
 	fprintf(stderr,"MALFORMED\n");
 	return;
     }
+    running = 0;
     for(i=0;i<hm->alloc;i++) {
 	NC_hentry e = hm->table[i];
 	if(e.flags == ACTIVE) {
 	    fprintf(stderr,"[%ld] flags=ACTIVE hashkey=%lu data=%p keysize=%u key=|%s|\n",
 		(unsigned long)i,(unsigned long)e.hashkey,(void*)e.data,(unsigned)e.keysize,keystr(&e));
+	    running = 0;
 	} else if(e.flags == DELETED) {
 	    fprintf(stderr,"[%ld] flags=DELETED hashkey=%lu\n",
 		(unsigned long)i,(unsigned long)e.hashkey);
+	    running = 0;
 	} else {/*empty*/
-	    fprintf(stderr,"[%ld] flags=EMPTY\n",(unsigned long)i);
+	    if(running == 0)
+	        fprintf(stderr,"[%ld] flags=EMPTY\n",(unsigned long)i);
+	    else if(running == 1)
+	        fprintf(stderr,"...\n");
+	    running++;
 	}
     }
     fflush(stderr);

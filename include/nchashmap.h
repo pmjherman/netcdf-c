@@ -102,7 +102,7 @@ extern int NC_hashmapfree(NC_hashmap*);
 extern int NC_hashmapdeactivate(NC_hashmap*, uintptr_t data);
 
 /* Return the hash key for specified key; takes key+size*/
-extern unsigned int NC_hashmapkey(void* key, size_t size);
+extern unsigned int NC_hashmapkey(const void* key, size_t size);
 
 #if 0
 /** Removes the storage for the element of the key; takes hashkey.

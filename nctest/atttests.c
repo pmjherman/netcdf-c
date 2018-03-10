@@ -362,6 +362,9 @@ test_ncattinq(path)
     }
     /* in data mode, check all attributes against test netcdf */
     for (ia = 0; ia < test.natts; ia++) {
+if(ia == 14 && current_format == NC_FORMAT_NETCDF4_CLASSIC) {
+int x = 0;
+}
 	if (ncattinq(cdfid, test.atts[ia].var, test.atts[ia].name,
 		      &type, &len) == -1) {
 	    error("%s: ncattinq failed", pname);

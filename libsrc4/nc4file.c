@@ -667,12 +667,13 @@ exit:
    return retval;
 }
 
+#ifdef NC4NOTUSED
 /**
  * @internal Define the names of attributes to ignore added by the
  * HDF5 dimension scale; these attached to variables. They cannot be
  * modified thru the netcdf-4 API.
  */
-const char* NC_RESERVED_VARATT_LIST[] = {
+static const char* NC_RESERVED_VARATT_LIST[] = {
    NC_ATT_REFERENCE_LIST,
    NC_ATT_CLASS,
    NC_ATT_DIMENSION_LIST,
@@ -687,7 +688,7 @@ const char* NC_RESERVED_VARATT_LIST[] = {
  * "hidden" global attributes. They can be read, but not modified thru
  * the netcdf-4 API.
  */
-const char* NC_RESERVED_ATT_LIST[] = {
+static const char* NC_RESERVED_ATT_LIST[] = {
    NC_ATT_FORMAT,
    NC3_STRICT_ATT_NAME,
    NCPROPS,
@@ -700,12 +701,13 @@ const char* NC_RESERVED_ATT_LIST[] = {
  * @internal Define the subset of the reserved list that is readable
  * by name only 
 */
-const char* NC_RESERVED_SPECIAL_LIST[] = {
+static const char* NC_RESERVED_SPECIAL_LIST[] = {
    ISNETCDF4ATT,
    SUPERBLOCKATT,
    NCPROPS,
    NULL
 };
+#endif
 
 size_t nc4_chunk_cache_size = CHUNK_CACHE_SIZE;            /**< Default chunk cache size. */
 size_t nc4_chunk_cache_nelems = CHUNK_CACHE_NELEMS;        /**< Default chunk cache number of elements. */
@@ -2083,14 +2085,9 @@ read_grp_atts(NC_GRP_INFO_T *grp)
 
       /* See if this a hidden, global attribute */
       if(grp->nc4_info->root_grp == grp) {
-         const char** reserved = NC_RESERVED_ATT_LIST;
-         hidden = 0;
-         for(;*reserved;reserved++) {
-            if(strcmp(*reserved,obj_name)==0) {
-               hidden = 1;
-               break;
-            }
-         }
+ 	 const NC_reservedatt* ra = NC_findreserved(obj_name);
+         if(ra != NULL && (ra->flags & NAMEONLYFLAG))
+	     hidden = 1;
       }
 
       /* This may be an attribute telling us that strict netcdf-3

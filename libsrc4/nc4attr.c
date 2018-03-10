@@ -372,14 +372,16 @@ NC4_inq_attname(int ncid, int varid, int attnum, char *name)
  * @author Dennis Heimbigner
  */
 static NCindex*
-getattlist(NC_GRP_INFO_T* grp, int varid)
+getattlist(NC_GRP_INFO_T* grp, int varid, NC_VAR_INFO_T** varp)
 {
-   if (varid == NC_GLOBAL)
+   if (varid == NC_GLOBAL) {
+      if(varp) *varp = NULL;
       return grp->att;
-   else {
+   } else {
       NC_VAR_INFO_T* var = (NC_VAR_INFO_T*)ncindexith(grp->vars,varid);
       if (!var) return NULL;
       assert(var->hdr.id == varid);
+      if(varp) *varp = var;
       return var->att;
    }
 }
@@ -434,7 +436,7 @@ NC4_rename_att(int ncid, int varid, const char *name, const char *newname)
       return retval;
 
    /* Is new name in use? */
-   list = getattlist(grp,varid);
+   list = getattlist(grp,varid,&var);
    if(list == NULL)
 	return NC_ENOTVAR;	
 
@@ -475,7 +477,7 @@ NC4_rename_att(int ncid, int varid, const char *name, const char *newname)
    }
 
    /* Copy the new name into our metadata. */
-   free(att->hdr.name);
+   if(att->hdr.name) free(att->hdr.name);
    if (!(att->hdr.name = strdup(norm_newname)))
       return NC_ENOMEM;
    att->hdr.hashkey = NC_hashmapkey(att->hdr.name,strlen(att->hdr.name)); /* Fix hash key */
@@ -546,7 +548,7 @@ NC4_del_att(int ncid, int varid, const char *name)
 
    /* Get either the global or a variable attribute list. Also figure
       out the HDF5 location it's attached to. */
-   attlist = getattlist(grp,varid);
+   attlist = getattlist(grp,varid,NULL);
    if(attlist == NULL)
 	return NC_ENOTVAR;	
 
@@ -632,7 +634,7 @@ NC4_put_att(int ncid, int varid, const char *name, nc_type file_type,
 
    /* Find att, if it exists. (Must check varid first or nc_test will
     * break.) */
-   attlist = getattlist(grp,varid);
+   attlist = getattlist(grp,varid,&var);
    if(attlist == NULL)
 	return NC_ENOTVAR;	
 

@@ -306,8 +306,11 @@ add_user_type(int ncid, size_t size, const char *name, nc_type base_typeid,
    type->nc_type_class = type_class;
    if (type_class == NC_VLEN)
       type->u.v.base_nc_typeid = base_typeid;
-   else if (type_class == NC_ENUM)
+   else if (type_class == NC_ENUM) {
       type->u.e.base_nc_typeid = base_typeid;
+      type->u.e.enum_member = nclistnew();
+   } else if (type_class == NC_COMPOUND)
+      type->u.c.field = nclistnew();
    
    /* Return the typeid to the user. */
    if (typeidp)

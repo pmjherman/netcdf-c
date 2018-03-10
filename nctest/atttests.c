@@ -1,7 +1,7 @@
 /*********************************************************************
  *   Copyright 1993, UCAR/Unidata
  *   See netcdf/COPYRIGHT file for copying and redistribution conditions.
- *   $Header: /upc/share/CVS/netcdf-3/nctest/atttests.c,v 1.18 2006/10/31 16:21:45 ed Exp $
+ *   $Header: /upc/share/CVS/netcdf-3/nctst/atttests.c,v 1.18 2006/10/31 16:21:45 ed Exp $
  *********************************************************************/
 
 #ifdef _MPW
@@ -362,9 +362,6 @@ test_ncattinq(path)
     }
     /* in data mode, check all attributes against test netcdf */
     for (ia = 0; ia < test.natts; ia++) {
-if(ia == 14 && current_format == NC_FORMAT_NETCDF4_CLASSIC) {
-int x = 0;
-}
 	if (ncattinq(cdfid, test.atts[ia].var, test.atts[ia].name,
 		      &type, &len) == -1) {
 	    error("%s: ncattinq failed", pname);

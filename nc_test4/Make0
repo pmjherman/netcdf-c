@@ -1,5 +1,6 @@
 # Test c output
-T=test_filter_misc
+T=tst_dims3
+
 #SRC=hdf5plugins/H5Zmisc.c
 
 #CMD=valgrind --leak-check=full

@@ -543,6 +543,7 @@ nc4_rec_find_named_type(NC_GRP_INFO_T *start_grp, char *name)
    /* Search subgroups. */
    for(i=0;i<ncindexsize(start_grp->children);i++) {
       g = (NC_GRP_INFO_T*)ncindexith(start_grp->children,i);
+      if(!g) continue;
       if ((res = nc4_rec_find_named_type(g, name)))
           return res;
    }
@@ -617,6 +618,7 @@ nc4_find_dim_len(NC_GRP_INFO_T *grp, int dimid, size_t **len)
    int retval;
    int i;
 
+if(!(grp && len))
    assert(grp && len);
    LOG((3, "nc4_find_dim_len: grp->name %s dimid %d", grp->hdr.name, dimid));
 
@@ -624,6 +626,7 @@ nc4_find_dim_len(NC_GRP_INFO_T *grp, int dimid, size_t **len)
     * them. */
    for(i=0;i<ncindexsize(grp->children);i++) {
       g = (NC_GRP_INFO_T*)ncindexith(grp->children,i);
+      if(g == NULL) continue;
       if ((retval = nc4_find_dim_len(g, dimid, len)))
          return retval;
    }
@@ -2033,12 +2036,14 @@ rec_print_metadata(NC_GRP_INFO_T *grp, int tab_count)
 
    for(i=0;i<ncindexsize(grp->att);i++) {
       att = (NC_ATT_INFO_T*)ncindexith(grp->att,i);
+      if(!att) continue;
       LOG((2, "%s GROUP ATTRIBUTE - attnum: %d name: %s type: %d len: %d",
            tabs, att->hdr.id, att->hdr.name, att->nc_typeid, att->len));
    }
 
    for(i=0;i<ncindexsize(grp->dim);i++) {
       dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,i);
+      if(!dim) continue;
       LOG((2, "%s DIMENSION - dimid: %d name: %s len: %d unlimited: %d",
            tabs, dim->hdr.id, dim->hdr.name, dim->len, dim->unlimited));
    }
@@ -2063,6 +2068,7 @@ rec_print_metadata(NC_GRP_INFO_T *grp, int tab_count)
            (dims_string ? dims_string : " -"),var->type_info->endianness, var->type_info->native_hdf_typeid));
       for(j=0;j<ncindexsize(var->att);j++) {
          att = (NC_ATT_INFO_T*)ncindexith(var->att,j);
+	 if(!att) continue;
          LOG((2, "%s VAR ATTRIBUTE - attnum: %d name: %s type: %d len: %d",
               tabs, att->hdr.id, att->hdr.name, att->nc_typeid, att->len));
       }
@@ -2076,10 +2082,9 @@ rec_print_metadata(NC_GRP_INFO_T *grp, int tab_count)
    for(i=0;i<ncindexsize(grp->type);i++)
    {
       if((type = (NC_TYPE_INFO_T*)ncindexith(grp->type,i)) == NULL) continue;
-      LOG((2, "%s TYPE - nc_typeid: %d hdf_typeid: 0x%x size: %d committed: %d "
+      LOG((2, "%s TYPE - nc_typeid: %d hdf_typeid: 0x%x committed: %d "
            "name: %s num_fields: %d", tabs, type->hdr.id,
-           type->hdf_typeid, type->size, (int)type->committed, type->hdr.name,
-           nclistlength(type->u.c.field)));
+           type->hdf_typeid, type->size, (int)type->committed, type->hdr.name));
       /* Is this a compound type? */
       if (type->nc_type_class == NC_COMPOUND)
       {
@@ -2144,7 +2149,9 @@ log_metadata_nc(NC *nc)
         "fill_mode: %d no_write: %d next_nc_grpid: %d", h5->hdfid, nc->path,
         h5->cmode, (int)h5->parallel, (int)h5->redef, h5->fill_mode, (int)h5->no_write,
         h5->next_nc_grpid));
-   return rec_print_metadata(h5->root_grp, 0);
+   if(nc_log_level >= 2)
+       return rec_print_metadata(h5->root_grp, 0);
+   return NC_NOERR;
 }
 
 #endif /*LOGGING */

@@ -187,6 +187,9 @@ NC4_inq_ncid(int ncid, const char *name, int *grp_ncid)
    assert(h5);
 
    /* Normalize name. */
+   if ((retval = nc4_check_name(name, norm_name)))
+      return retval;
+
    g = (NC_GRP_INFO_T*)ncindexlookup(grp->children,norm_name);
    if(g != NULL) 
    {

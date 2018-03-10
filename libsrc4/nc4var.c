@@ -1513,12 +1513,11 @@ NC4_rename_var(int ncid, int varid, const char *name)
    if (!var)
       return NC_ENOTVAR;
 
-   /* Check if new name is in use */
+   /* Check if new name is in use; note that renaming to same name is still an error
+      according to the nc_test/test_write.c code. Why?*/
    tmpvar = (NC_VAR_INFO_T*)ncindexlookup(grp->vars,name);
-   if(tmpvar != NULL) {
-	if(tmpvar != var)
-	    return NC_ENAMEINUSE;
-   }
+   if(tmpvar != NULL)
+       return NC_ENAMEINUSE;
 
    /* If we're not in define mode, new name must be of equal or
       less size, if strict nc3 rules are in effect for this . */

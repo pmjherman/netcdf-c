@@ -31,7 +31,7 @@
 int
 NC4_def_grp(int parent_ncid, const char *name, int *new_ncid)
 {
-   NC_GRP_INFO_T *grp;
+   NC_GRP_INFO_T *grp, *g;
    NC_HDF5_FILE_INFO_T *h5;
    char norm_name[NC_MAX_NAME + 1];
    int retval;
@@ -63,10 +63,10 @@ NC4_def_grp(int parent_ncid, const char *name, int *new_ncid)
    /* Update internal lists to reflect new group. The actual HDF5
     * group creation will be done when metadata is written by a
     * sync. */
-   if ((retval = nc4_grp_list_add(grp, norm_name, NULL)))
+   if ((retval = nc4_grp_list_add(grp, norm_name, &g)))
       return retval;
    if (new_ncid)
-      *new_ncid = grp->nc4_info->controller->ext_ncid | grp->hdr.id;
+      *new_ncid = grp->nc4_info->controller->ext_ncid | g->hdr.id;
    
    return NC_NOERR;
 }
@@ -577,7 +577,8 @@ NC4_inq_dimids(int ncid, int *ndims, int *dimids, int include_parents)
       /* Get dimension ids from this group. */
       for(i=0;i<ncindexsize(grp->dim);i++) {
 	 dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,i);
-         if(dim != NULL) dimids[n++] = dim->hdr.id;
+	 if(dim == NULL) continue;
+         dimids[n++] = dim->hdr.id;
       }
       
       /* Get dimension ids from parent groups. */
@@ -585,7 +586,8 @@ NC4_inq_dimids(int ncid, int *ndims, int *dimids, int include_parents)
          for (g = grp->parent; g; g = g->parent) {
 	    for(i=0;i<ncindexsize(grp->dim);i++) {
 	       dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,i);
-               if(dim != NULL) dimids[n++] = dim->hdr.id;
+	       if(dim == NULL) continue;
+               dimids[n++] = dim->hdr.id;
 	    }
 	 }      
       qsort(dimids, num, sizeof(int), int_cmp);

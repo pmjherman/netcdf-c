@@ -56,6 +56,7 @@ NC4_inq_unlimdim(int ncid, int *unlimdimidp)
 	 for(i=0;i<ncindexsize(grp->dim);i++)
          {
 	    dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,i);
+	    if(dim == NULL) continue;
             if (dim->unlimited)
             {
                *unlimdimidp = dim->hdr.id;
@@ -122,6 +123,7 @@ NC4_def_dim(int ncid, const char *name, size_t len, int *idp)
       if (len == NC_UNLIMITED) {
 	 for(i=0;i<ncindexsize(grp->dim);i++) {
 	    dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,i);
+	    if(dim == NULL) continue;
             if (dim->unlimited)
                return NC_EUNLIMIT;
 	}
@@ -182,11 +184,12 @@ int
 NC4_inq_dimid(int ncid, const char *name, int *idp)
 {
    NC *nc;
-   NC_GRP_INFO_T *grp;
+   NC_GRP_INFO_T *grp, *g;
    NC_HDF5_FILE_INFO_T *h5;
    NC_DIM_INFO_T *dim;
    char norm_name[NC_MAX_NAME + 1];
    int retval;
+   int found;
 
    LOG((2, "%s: ncid 0x%x name %s", __func__, ncid, name));
 
@@ -203,10 +206,15 @@ NC4_inq_dimid(int ncid, const char *name, int *idp)
    if ((retval = nc4_normalize_name(name, norm_name)))
       return retval;
 
-   /* check for a name match. */
-   dim = (NC_DIM_INFO_T*)ncindexlookup(grp->dim,norm_name);
-   if(dim == NULL)
+   /* check for a name match in this group and its parents */
+   found = 0;
+   for (g = grp; g ; g = g->parent) {
+       dim = (NC_DIM_INFO_T*)ncindexlookup(g->dim,norm_name);
+       if(dim != NULL) {found = 1; break;}
+   }
+   if(!found)
       return NC_EBADDIM;
+   assert(dim != NULL);
    if (idp)
 	*idp = dim->hdr.id;
    return NC_NOERR;
@@ -439,7 +447,8 @@ NC4_inq_unlimdims(int ncid, int *nunlimdimsp, int *unlimdimidsp)
       for(i=0;i<ncindexsize(grp->dim);i++) 
       {
 	 dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,i);
-         if (dim && dim->unlimited)
+	 if(dim == NULL) continue;
+         if (dim->unlimited)
          {
             if (unlimdimidsp)
                unlimdimidsp[num_unlim] = dim->hdr.id;

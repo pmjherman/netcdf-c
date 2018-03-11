@@ -507,6 +507,7 @@ nc4_rec_find_hdf_type(NC_HDF5_FILE_INFO_T* h5, hid_t target_hdf_typeid)
 
    for(i=0;i<nclistlength(h5->alltypes);i++) {
 	type = (NC_TYPE_INFO_T*)nclistget(h5->alltypes,i);	
+	if(type == NULL) continue;
         /* Is this the type we are searching for? */
         if ((equal = H5Tequal(type->native_hdf_typeid ? type->native_hdf_typeid : type->hdf_typeid, target_hdf_typeid)) < 0)
          return NULL;
@@ -543,7 +544,7 @@ nc4_rec_find_named_type(NC_GRP_INFO_T *start_grp, char *name)
    /* Search subgroups. */
    for(i=0;i<ncindexsize(start_grp->children);i++) {
       g = (NC_GRP_INFO_T*)ncindexith(start_grp->children,i);
-      if(!g) continue;
+      if(g == NULL) continue;
       if ((res = nc4_rec_find_named_type(g, name)))
           return res;
    }
@@ -637,7 +638,7 @@ if(!(grp && len))
    {
       size_t mylen;
       var = (NC_VAR_INFO_T*)ncindexith(grp->vars,i);
-      if (!var) continue;
+      if (var == NULL) continue;
 
       /* Find max length of dim in this variable... */
       if ((retval = find_var_dim_max_length(grp, var->hdr.id, dimid, &mylen)))
@@ -2036,14 +2037,14 @@ rec_print_metadata(NC_GRP_INFO_T *grp, int tab_count)
 
    for(i=0;i<ncindexsize(grp->att);i++) {
       att = (NC_ATT_INFO_T*)ncindexith(grp->att,i);
-      if(!att) continue;
+      if(att == NULL) continue;
       LOG((2, "%s GROUP ATTRIBUTE - attnum: %d name: %s type: %d len: %d",
            tabs, att->hdr.id, att->hdr.name, att->nc_typeid, att->len));
    }
 
    for(i=0;i<ncindexsize(grp->dim);i++) {
       dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,i);
-      if(!dim) continue;
+      if(dim == NULL) continue;
       LOG((2, "%s DIMENSION - dimid: %d name: %s len: %d unlimited: %d",
            tabs, dim->hdr.id, dim->hdr.name, dim->len, dim->unlimited));
    }
@@ -2052,7 +2053,7 @@ rec_print_metadata(NC_GRP_INFO_T *grp, int tab_count)
    {
       int j;
       var = (NC_VAR_INFO_T*)ncindexith(grp->vars,i);
-      if (!var) continue;
+      if (var == NULL) continue;
       if(var->ndims > 0)
       {
          dims_string = (char*)malloc(sizeof(char)*(var->ndims*4));
@@ -2068,7 +2069,7 @@ rec_print_metadata(NC_GRP_INFO_T *grp, int tab_count)
            (dims_string ? dims_string : " -"),var->type_info->endianness, var->type_info->native_hdf_typeid));
       for(j=0;j<ncindexsize(var->att);j++) {
          att = (NC_ATT_INFO_T*)ncindexith(var->att,j);
-	 if(!att) continue;
+	 if(att == NULL) continue;
          LOG((2, "%s VAR ATTRIBUTE - attnum: %d name: %s type: %d len: %d",
               tabs, att->hdr.id, att->hdr.name, att->nc_typeid, att->len));
       }

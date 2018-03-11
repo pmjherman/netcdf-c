@@ -578,6 +578,7 @@ NC4_del_att(int ncid, int varid, const char *name)
    /* Renumber all attributes with higher indices. */
    for(i=0;i<ncindexsize(attlist);i++) {
        NC_ATT_INFO_T* a = (NC_ATT_INFO_T*)ncindexith(attlist,i);
+       if(a == NULL) continue;
        if(a->hdr.id > deletedid) a->hdr.id--;
    }
 

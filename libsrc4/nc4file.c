@@ -2084,6 +2084,7 @@ read_grp_atts(NC_GRP_INFO_T *grp)
       LOG((3, "reading attribute of _netCDF group, named %s", obj_name));
 
       /* See if this a hidden, global attribute */
+      hidden = 0; /* default */
       if(grp->nc4_info->root_grp == grp) {
  	 const NC_reservedatt* ra = NC_findreserved(obj_name);
          if(ra != NULL && (ra->flags & NAMEONLYFLAG))
@@ -2384,6 +2385,7 @@ nc4_rec_read_metadata(NC_GRP_INFO_T *grp)
 
    /* Set user data for iteration */
    udata.grp = grp;
+   udata.grps = nclistnew();
 
    /* Iterate over links in this group, building lists for the types,
     *  datasets and groups encountered
@@ -2421,8 +2423,8 @@ nc4_rec_read_metadata(NC_GRP_INFO_T *grp)
    /* when exiting define mode, mark all variable written */
    for (i=0; i<ncindexsize(grp->vars); i++) {
       NC_VAR_INFO_T* var = (NC_VAR_INFO_T*)ncindexith(grp->vars,i);
-      if(var != NULL)
-          var->written_to = NC_TRUE;
+      if(var == NULL) continue;
+      var->written_to = NC_TRUE;
    }
 
 exit:
@@ -2806,8 +2808,8 @@ static int NC4_enddef(int ncid)
    /* when exiting define mode, mark all variable written */
    for (i=0; i<ncindexsize(grp->vars); i++) {
       NC_VAR_INFO_T* var = (NC_VAR_INFO_T*)ncindexith(grp->vars,i);
-      if(var != NULL)
-          var->written_to = NC_TRUE;
+      if(var != NULL) continue;
+      var->written_to = NC_TRUE;
    }
 
    return nc4_enddef_netcdf4_file(nc4_info);
@@ -2991,7 +2993,8 @@ NC4_inq(int ncid, int *ndimsp, int *nvarsp, int *nattsp, int *unlimdimidp)
       /* Note that this code is inconsistent with nc_inq_unlimid() */
       for(i=0;i<ncindexsize(grp->dim);i++) {
 	NC_DIM_INFO_T* d = (NC_DIM_INFO_T*)ncindexith(grp->dim,i);
-	if(d != NULL && d->unlimited) {
+        if(d == NULL) continue;
+	if(d->unlimited) {
             *unlimdimidp = d->hdr.id;
             break;
          }

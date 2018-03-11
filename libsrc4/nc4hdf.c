@@ -59,7 +59,8 @@ flag_atts_dirty(NCindex *attlist) {
 
    for(i=0;i<ncindexsize(attlist);i++) {
       att = (NC_ATT_INFO_T*)ncindexith(attlist,i);
-      if(att != NULL) att->dirty = NC_TRUE;
+      if(att == NULL) continue;
+      att->dirty = NC_TRUE;
    }
 
    return NC_NOERR;
@@ -2714,7 +2715,7 @@ nc4_rec_detect_need_to_preserve_dimids(NC_GRP_INFO_T *grp, nc_bool_t *bad_coord_
    for (i=0; i < ncindexsize(grp->vars); i++)
    {
       var = (NC_VAR_INFO_T*)ncindexith(grp->vars,i);
-      if (!var) continue;
+      if (var == NULL) continue;
       /* Only matters for dimension scale variables, with non-scalar dimensionality */
       if (var->dimscale && var->ndims)
       {

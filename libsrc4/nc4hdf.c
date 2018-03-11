@@ -2223,7 +2223,7 @@ attach_dimscales(NC_GRP_INFO_T *grp)
       }
       else /* not a dimscale... */
       {
-         /* Find the scale for each dimension and attach it. */
+         /* Find the scale for each dimension, if any, and attach it. */
          for (d = 0; d < var->ndims; d++)
          {
             /* Is there a dimscale for this dimension? */
@@ -2796,6 +2796,7 @@ nc4_rec_write_metadata(NC_GRP_INFO_T *grp, nc_bool_t bad_coord_order)
     * group. */
    dim_index = 0;
    var_index = 0;
+   /* prime the loop */
    dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,dim_index);
    var = (NC_VAR_INFO_T*)ncindexith(grp->vars,var_index);
    /* Because of HDF5 ordering the dims and vars have to be stored in
@@ -2807,7 +2808,7 @@ nc4_rec_write_metadata(NC_GRP_INFO_T *grp, nc_bool_t bad_coord_order)
 
       /* Write non-coord dims in order, stopping at the first one that
        * has an associated coord var. */
-      for (found_coord = NC_FALSE; dim && !found_coord; dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,++dim_index))
+      for (found_coord = NC_FALSE; dim && !found_coord; )
       {
          if (!dim->coord_var)
          {
@@ -2819,6 +2820,7 @@ nc4_rec_write_metadata(NC_GRP_INFO_T *grp, nc_bool_t bad_coord_order)
             coord_varid = dim->coord_var->hdr.id;
             found_coord = NC_TRUE;
          }
+	 dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,++dim_index);
       }
 
       /* Write each var. When we get to the coord var we are waiting
@@ -2829,10 +2831,7 @@ nc4_rec_write_metadata(NC_GRP_INFO_T *grp, nc_bool_t bad_coord_order)
             return retval;
          if (found_coord && var->hdr.id == coord_varid)
             wrote_coord = NC_TRUE;
-         if (++var_index < ncindexsize(grp->vars))
-            var = (NC_VAR_INFO_T*)ncindexith(grp->vars,var_index);
-         else
-            var = NULL;
+         var = (NC_VAR_INFO_T*)ncindexith(grp->vars,++var_index);
       }
    } /* end while */
 

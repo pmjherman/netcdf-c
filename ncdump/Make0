@@ -1,5 +1,5 @@
 # Test c output
-T=tst_special_atts
+T=tst_group_data
 #ARGS=./x.nc
 
 #TF=test_atomic_array.cdl

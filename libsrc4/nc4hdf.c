@@ -2243,6 +2243,7 @@ attach_dimscales(NC_GRP_INFO_T *grp)
                      dim_datasetid = dim1->coord_var->hdf_datasetid;
                   else
                      dim_datasetid = dim1->hdf_dimscaleid;
+if(!(dim_datasetid > 0))
                   assert(dim_datasetid > 0);
                   if (H5DSattach_scale(var->hdf_datasetid, dim_datasetid, d) < 0)
                      BAIL(NC_EHDFERR);
@@ -3921,6 +3922,20 @@ nc4_rec_match_dimscales(NC_GRP_INFO_T *grp)
       int d;
       if((var = (NC_VAR_INFO_T*)ncindexith(grp->vars,i)) == NULL) continue;
       /* Check all vars and see if dim[i] != NULL if dimids[i] valid. */
+      /* This loop is very odd. Under normal circumstances, var->dimid[d] is zero
+         (from the initial calloc) which is a legitimate dimid. The code does not
+         distinquish this case from the dimscale case where the id might actually
+         be defined.
+         The original nc4_find_dim searched up the group tree looking for the given
+         dimid in one of the dim lists associated with each ancestor group.
+         I changed nc4_fnd_dim to use the dimid directly using h5->alldims.
+         However, here that is incorrect because it will find the dimid 0 always
+         (if any dimensions were defined). Except that when dimscale dimids have
+         been defined, one or more of the values in var->dimids will have a
+         legitmate value.
+         The solution I choose is to modify nc4_var_list_add to initialize dimids to
+         illegal values (-1). This is another example of the problems with dimscales.
+       */
       ndims = var->ndims;
       for (d = 0; d < ndims; d++)
       {
@@ -4021,17 +4036,18 @@ nc4_rec_match_dimscales(NC_GRP_INFO_T *grp)
             for (d = 0; d < var->ndims; d++)
             {
 	       int k;
+	       int match;
                /* Is there already a phony dimension of the correct size? */
-	       for(k=0;k<ncindexsize(grp->dim);k++) {
+	       for(match=-1,k=0;k<ncindexsize(grp->dim);k++) {
 	 	  if((dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,k)) == NULL) continue;
                   if ((dim->len == h5dimlen[d]) &&
                       ((h5dimlenmax[d] == H5S_UNLIMITED && dim->unlimited) ||
                        (h5dimlenmax[d] != H5S_UNLIMITED && !dim->unlimited)))
-                     break;
+                     {match = k; break;}
 	       }
 
                /* Didn't find a phony dim? Then create one. */
-               if (!dim)
+               if (match < 0)
                {
                   char phony_dim_name[NC_MAX_NAME + 1];
                   sprintf(phony_dim_name, "phony_dim_%d", grp->nc4_info->next_dimid);

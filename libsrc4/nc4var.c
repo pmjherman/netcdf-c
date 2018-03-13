@@ -558,7 +558,7 @@ NC4_def_var(int ncid, const char *name, nc_type xtype,
    }
 
    /* Create a new var and fill in some HDF5 cache setting values. */
-   if ((retval = nc4_var_add(grp, name, ndims, &var)))
+   if ((retval = nc4_var_list_add(grp, norm_name, ndims, &var)))
       BAIL(retval);
    var->is_new_var = NC_TRUE;
 

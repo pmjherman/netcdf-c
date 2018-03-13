@@ -619,7 +619,6 @@ nc4_find_dim_len(NC_GRP_INFO_T *grp, int dimid, size_t **len)
    int retval;
    int i;
 
-if(!(grp && len))
    assert(grp && len);
    LOG((3, "nc4_find_dim_len: grp->name %s dimid %d", grp->hdr.name, dimid));
 
@@ -778,7 +777,8 @@ static void
 obj_list_add(NCindex* index, NC_OBJ* obj)
 {
     /* Insert object into the index */
-    ncindexset(index,obj->id,obj);
+//    ncindexset(index,obj->id,obj);
+    ncindexadd(index,obj);
 }
 
 /**
@@ -830,7 +830,7 @@ obj_list_del(NCindex* index, NC_OBJ *obj)
  * @author Ed Hartnett
  */
 int
-nc4_var_add(NC_GRP_INFO_T* grp, const char* name, int ndims, NC_VAR_INFO_T **var)
+nc4_var_list_add(NC_GRP_INFO_T* grp, const char* name, int ndims, NC_VAR_INFO_T **var)
 {
    NC_VAR_INFO_T *new_var = NULL;
    int retval = NC_NOERR;
@@ -861,6 +861,9 @@ nc4_var_add(NC_GRP_INFO_T* grp, const char* name, int ndims, NC_VAR_INFO_T **var
          BAIL(NC_ENOMEM);
       if (!(new_var->dimids = calloc(ndims, sizeof(int))))
          BAIL(NC_ENOMEM);
+      /* Initialize dimids to illegal values (-1). See the comment
+         in nc4hdf.c#nc4_rec_match_dimscales. */
+      memset(new_var->dimids, -1, ndims*sizeof(int));
    }
 
    new_var->att = ncindexnew(0);

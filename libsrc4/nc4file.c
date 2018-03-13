@@ -63,15 +63,15 @@ typedef struct {
 
 /* Must be in sorted order for binary search */
 static const NC_reservedatt NC_reserved[NRESERVED] = {
-{NC_ATT_CLASS, DIMSCALEFLAG},		 /*CLASS*/
-{NC_ATT_DIMENSION_LIST, DIMSCALEFLAG},	 /*DIMENSION_LIST*/
-{NC_ATT_NAME, DIMSCALEFLAG},		 /*NAME*/
-{NC_ATT_REFERENCE_LIST, DIMSCALEFLAG},	 /*REFERENCE_LIST*/
+{NC_ATT_CLASS, READONLYFLAG|DIMSCALEFLAG},		 /*CLASS*/
+{NC_ATT_DIMENSION_LIST, READONLYFLAG|DIMSCALEFLAG},	 /*DIMENSION_LIST*/
+{NC_ATT_NAME, READONLYFLAG|DIMSCALEFLAG},		 /*NAME*/
+{NC_ATT_REFERENCE_LIST, READONLYFLAG|DIMSCALEFLAG},	 /*REFERENCE_LIST*/
 {NC_ATT_FORMAT, READONLYFLAG},		 /*_Format*/
 {ISNETCDF4ATT, READONLYFLAG|NAMEONLYFLAG}, /*_IsNetcdf4*/
 {NCPROPS, READONLYFLAG|NAMEONLYFLAG},	 /*_NCProperties*/
-{NC_ATT_COORDINATES, DIMSCALEFLAG},	 /*_Netcdf4Coordinates*/
-{NC_DIMID_ATT_NAME, DIMSCALEFLAG},	 /*_Netcdf4Dimid*/
+{NC_ATT_COORDINATES, READONLYFLAG|DIMSCALEFLAG},	 /*_Netcdf4Coordinates*/
+{NC_DIMID_ATT_NAME, READONLYFLAG|DIMSCALEFLAG},	 /*_Netcdf4Dimid*/
 {SUPERBLOCKATT, READONLYFLAG|NAMEONLYFLAG},/*_SuperblockVersion*/
 {NC3_STRICT_ATT_NAME, READONLYFLAG},	 /*_nc3_strict*/
 };
@@ -1557,6 +1557,9 @@ read_type(NC_GRP_INFO_T *grp, hid_t hdf_typeid, char *type_name)
       if ((nmembers = H5Tget_nmembers(hdf_typeid)) < 0)
          return NC_EHDFERR;
       LOG((5, "compound type has %d members", nmembers));
+      type->u.c.field = nclistnew();
+      nclistsetalloc(type->u.c.field,nmembers);
+
       for (m = 0; m < nmembers; m++)
       {
          hid_t member_hdf_typeid;
@@ -1564,7 +1567,6 @@ read_type(NC_GRP_INFO_T *grp, hid_t hdf_typeid, char *type_name)
          size_t member_offset;
          H5T_class_t mem_class;
          nc_type member_xtype;
-
 
          /* Get the typeid and native typeid of this member of the
           * compound type. */
@@ -1726,6 +1728,7 @@ read_type(NC_GRP_INFO_T *grp, hid_t hdf_typeid, char *type_name)
       /* Find out how many member are in the enum. */
       if ((nmembers = H5Tget_nmembers(hdf_typeid)) < 0)
          return NC_EHDFERR;
+      type->u.e.enum_member = nclistnew();
       nclistsetalloc(type->u.e.enum_member,nmembers);
 
       /* Allocate space for one value. */
@@ -1838,7 +1841,7 @@ read_var(NC_GRP_INFO_T *grp, hid_t datasetid, const char *obj_name,
 	finalname = strdup(obj_name);
 
    /* Add a variable to the end of the group's var list. */
-   if ((retval = nc4_var_add(grp,finalname,ndims,&var)))
+   if ((retval = nc4_var_list_add(grp,finalname,ndims,&var)))
       BAIL(retval);
 
    /* Fill in what we already know. */

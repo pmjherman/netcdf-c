@@ -513,6 +513,7 @@ NC4_del_att(int ncid, int varid, const char *name)
 {
    NC *nc;
    NC_GRP_INFO_T *grp;
+   NC_VAR_INFO_T *var;
    NC_HDF5_FILE_INFO_T *h5;
    NC_ATT_INFO_T *att;
    NCindex* attlist = NULL;
@@ -548,9 +549,13 @@ NC4_del_att(int ncid, int varid, const char *name)
 
    /* Get either the global or a variable attribute list. Also figure
       out the HDF5 location it's attached to. */
-   attlist = getattlist(grp,varid,NULL);
+   attlist = getattlist(grp,varid,&var);
    if(attlist == NULL)
 	return NC_ENOTVAR;	
+   if (varid == NC_GLOBAL)
+      locid = grp->hdf_grpid;
+   else if (var->created)
+      locid = var->hdf_datasetid;
 
    /* Now find the attribute by name */
    att = (NC_ATT_INFO_T*)ncindexlookup(attlist,name);
@@ -663,12 +668,15 @@ NC4_put_att(int ncid, int varid, const char *name, nc_type file_type,
    if ((retval = nc4_check_name(name, norm_name)))
       return retval;
 
-   /* Check that a reserved att name is not being used improperly:
-      where improper => grp=root, varid==NC_GLOBAL, flags&NAMEONLYFLAG
-   */
-   if (nc->ext_ncid == ncid && varid == NC_GLOBAL && grp->parent == NULL) {
-      const NC_reservedatt* ra = NC_findreserved(name);
-      if(ra != NULL && (ra->flags & NAMEONLYFLAG))
+   /* Check that a reserved att name is not being used improperly */
+   const NC_reservedatt* ra = NC_findreserved(name);
+   if(ra != NULL) {
+	/* case 1: grp=root, varid==NC_GLOBAL, flags & READONLYFLAG */
+        if (nc->ext_ncid == ncid && varid == NC_GLOBAL && grp->parent == NULL
+	    && (ra->flags & READONLYFLAG))
+	    return NC_ENAMEINUSE;
+	/* case 2: grp=NA, varid!=NC_GLOBAL, flags & DIMSCALEFLAG */
+        if (varid != NC_GLOBAL && (ra->flags & DIMSCALEFLAG))
 	    return NC_ENAMEINUSE;
    }
 

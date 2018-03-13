@@ -584,8 +584,8 @@ NC4_inq_dimids(int ncid, int *ndims, int *dimids, int include_parents)
       /* Get dimension ids from parent groups. */
       if (include_parents)
          for (g = grp->parent; g; g = g->parent) {
-	    for(i=0;i<ncindexsize(grp->dim);i++) {
-	       dim = (NC_DIM_INFO_T*)ncindexith(grp->dim,i);
+	    for(i=0;i<ncindexsize(g->dim);i++) {
+	       dim = (NC_DIM_INFO_T*)ncindexith(g->dim,i);
 	       if(dim == NULL) continue;
                dimids[n++] = dim->hdr.id;
 	    }

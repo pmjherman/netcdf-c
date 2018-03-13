@@ -253,7 +253,7 @@ main(int argc, char **argv)
          const char** reserved = NC_RESERVED_VARATT_LIST;
          for ( ; *reserved; reserved++)
          {
-            if (nc_put_att_text(ncid, 0, *reserved, strlen(CONTENTS),
+           if (nc_put_att_text(ncid, 0, *reserved, strlen(CONTENTS),
                                 CONTENTS) != NC_ENAMEINUSE) ERR;
          }
       }

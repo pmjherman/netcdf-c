@@ -1098,7 +1098,7 @@ IF (ENABLE_PARALLEL_TESTS AND NOT USE_PARALLEL)
 ENDIF()
 
 # Enable special filter test; experimental when using cmake.
-OPTION(ENABLE_FILTER_TESTING "Enable filter testing. Ignored if shared libraries or netCDF4 are not enabled" OFF)
+OPTION(ENABLE_FILTER_TESTING "Enable filter testing. Ignored if shared libraries or netCDF4 are not enabled" ON)
 IF(NOT ENABLE_NETCDF4)
   MESSAGE(WARNING "ENABLE_FILTER_TESTING requires netCDF-4. Disabling.")
   SET(ENABLE_FILTER_TESTING OFF CACHE BOOL "")
@@ -1763,6 +1763,17 @@ STRING(REPLACE ";" " " LINKFLAGS "${LINKFLAGS}")
 
 LIST(REMOVE_DUPLICATES NC_LIBS)
 LIST(REMOVE_DUPLICATES LINKFLAGS)
+
+IF(ENABLE_FILTER_TESTING)
+IF(ENABLE_EXAMPLES)
+MESSAGE(STATUS "copying filter plugin building files")
+FILE(COPY ${netCDF_SOURCE_DIR}/nc_test4/findplugin.sh
+     DESTINATION ${netCDF_BINARY_DIR}/nc_test4/)
+FILE(COPY ${netCDF_SOURCE_DIR}/nc_test4/hdf5plugins/
+     DESTINATION ${netCDF_BINARY_DIR}/nc_test4/hdf5plugins/
+     FILES_MATCHING EXCLUDE Makefile.am CMakeLists.txt)
+ENDIF()
+ENDIF()
 
 configure_file(
   ${netCDF_SOURCE_DIR}/netcdf.pc.in

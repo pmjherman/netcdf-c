@@ -53,10 +53,4 @@ CLEANFILES = *.nc
 
 EXTRA_DIST = CMakeLists.txt run_examples.sh run_examples4.sh
 
-if ENABLE_FILTER_TESTING # => shared and netcdf-4
-BUILT_SOURCES = findplugin.sh
-findplugin.sh:
-	cp ${top_builddir}/nc_test4/findplugin.sh ${builddir}
-endif
-
 DISTCLEANFILES = findplugin.sh

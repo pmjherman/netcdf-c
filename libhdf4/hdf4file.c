@@ -129,7 +129,7 @@ get_netcdf_type_from_hdf4(NC_HDF5_FILE_INFO_T *h5, int32 hdf4_typeid,
     * I can hazard a guess or two.
     */
    int endianness = NC_ENDIAN_BIG;
-   assert(h5 && xtypep);
+   assert(h5);
 
    switch(hdf4_typeid)
    {
@@ -222,6 +222,7 @@ get_netcdf_type_from_hdf4(NC_HDF5_FILE_INFO_T *h5, int32 hdf4_typeid,
 
       if (!(type = calloc(1, sizeof(NC_TYPE_INFO_T))))
          return NC_ENOMEM;
+      type->hdr.sort = NCTYP;
       if (hdf4_typeid == DFNT_FLOAT32)
          type->nc_type_class = NC_FLOAT;
       else if (hdf4_typeid == DFNT_FLOAT64)
@@ -232,9 +233,11 @@ get_netcdf_type_from_hdf4(NC_HDF5_FILE_INFO_T *h5, int32 hdf4_typeid,
          type->nc_type_class = NC_INT;
       type->endianness = endianness;
       type->size = nc_type_size_g[t];
-      if((type->hdr.name = strdup(nc_type_name_g[t])))
-	return NC_ENOMEM;
       type->hdr.id = xtype;
+      type->hdr.name = strdup(nc_type_name_g[t]);
+      if(type->hdr.name == NULL)
+	return NC_ENOMEM;
+      type->hdr.hashkey = NC_hashmapkey(type->hdr.name,strlen(type->hdr.name));
       if(typep) *typep = type;
    }
 
@@ -325,6 +328,8 @@ nc4_open_hdf4_file(const char *path, int mode, NC *nc)
    for (v = 0; v < num_datasets; v++)
    {
       int32 data_type, num_atts;
+      int sdsid;
+
       /* Problem: Number of dims is returned by the call that requires
          a pre-allocated array, 'dimsize'.
          From SDS_SD website:
@@ -338,17 +343,17 @@ nc4_open_hdf4_file(const char *path, int mode, NC *nc)
       char name[NC_MAX_HDF4_NAME+1];
 
       /* Open this dataset in HDF4 file. */
-      if ((var->sdsid = SDselect(h5->sdid, v)) == FAIL)
+      if ((sdsid = SDselect(h5->sdid, v)) == FAIL)
          {retval = NC_EVARMETA; goto fail;}
 
       /* Invoke SDgetInfo with null dimsize to get rank. */
-      if (SDgetinfo(var->sdsid, name, &rank, NULL, &data_type, &num_atts))
+      if (SDgetinfo(sdsid, name, &rank, NULL, &data_type, &num_atts))
          {retval = NC_EVARMETA; goto fail;}
 
       if(!(dimsize = (int32*)malloc(sizeof(int32)*rank)))
          {retval = NC_ENOMEM; goto fail;}
 
-      if (SDgetinfo(var->sdsid, name, &rank, dimsize, &data_type, &num_atts))
+      if (SDgetinfo(sdsid, name, &rank, dimsize, &data_type, &num_atts))
          {retval = NC_EVARMETA; goto fail;}
 
       /* Add a variable. */
@@ -357,6 +362,7 @@ nc4_open_hdf4_file(const char *path, int mode, NC *nc)
       var->created = NC_TRUE;
       var->written_to = NC_TRUE;
       var->hdf4_data_type = data_type;
+      var->sdsid = sdsid;
 
       /* Fill special type_info struct for variable type information. */
       if ((retval = get_netcdf_type_from_hdf4(h5, data_type, NULL, &var->type_info)))
@@ -462,7 +468,7 @@ nc4_open_hdf4_file(const char *path, int mode, NC *nc)
       {
          /* HDF4 files can be chunked */
          HDF_CHUNK_DEF chunkdefs;
-         long flag;
+         int flag;
          if(!SDgetchunkinfo(var->sdsid, &chunkdefs, &flag)) {
             if(flag == HDF_NONE)
                var->contiguous = NC_TRUE;

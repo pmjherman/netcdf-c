@@ -361,15 +361,15 @@ sortname(NC_SORT sort)
 }
 
 void
-printindexlist(NCindex* lm)
+printindexlist(NClist* lm)
 {
     int i;
     if(lm == NULL) {
 	fprintf(stderr,"<empty>\n");
 	return;
     }
-    for(i=0;i<nclistlength(lm->list);i++) {
-	NC_OBJ* o = (NC_OBJ*)nclistget(lm->list,i);
+    for(i=0;i<nclistlength(lm);i++) {
+	NC_OBJ* o = (NC_OBJ*)nclistget(lm,i);
 	if(o == NULL)
             fprintf(stderr,"[%ld] <null>\n",(unsigned long)i);
 	else
@@ -397,7 +397,7 @@ printindex(NCindex* lm)
 	fprintf(stderr,"<empty>\n");
 	return;
     }
-    printindexlist(lm);
+    printindexlist(lm->list);
 #ifndef NCNOHASH
     printindexmap(lm);
 #endif

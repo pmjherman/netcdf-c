@@ -181,7 +181,9 @@ typedef struct NC_VAR_INFO
    nc_bool_t written_to;        /* True if variable has data written to it */
    struct NC_TYPE_INFO *type_info;
    hid_t hdf_datasetid;
+#if 0
    int natts;			/* Use explicit index because there may be gaps in numbers */
+#endif
    NCindex* att; 		/* NCindex<NC_ATT_INFO_T*> */
    nc_bool_t no_fill;           /* True if no fill value is defined for var */
    void *fill_value;
@@ -397,13 +399,13 @@ int nc4_type_free(NC_TYPE_INFO_T *type);
 int nc4_nc4f_list_add(NC *nc, const char *path, int mode);
 void nc4_file_list_del(NC *nc);
 int nc4_var_list_add(NC_GRP_INFO_T* grp, const char* name, int ndims, NC_VAR_INFO_T **var);
-int nc4_var_del(NC_VAR_INFO_T *var);
+int nc4_var_list_del(NC_GRP_INFO_T* grp, NC_VAR_INFO_T *var);
 int nc4_dim_list_add(NC_GRP_INFO_T* grp, const char* name, size_t len, int assignedid, NC_DIM_INFO_T **dim);
-int nc4_dim_list_del(NC_DIM_INFO_T *dim);
+int nc4_dim_list_del(NC_GRP_INFO_T* grp, NC_DIM_INFO_T *dim);
 int nc4_dim_free(NC_DIM_INFO_T *dim);
 int nc4_type_new(NC_GRP_INFO_T *grp, size_t size, const char *name, int assignedid, NC_TYPE_INFO_T **type);
 int nc4_type_list_add(NC_GRP_INFO_T *grp, size_t size, const char *name, NC_TYPE_INFO_T **type);
-int nc4_type_list_del(NC_TYPE_INFO_T *type);
+int nc4_type_list_del(NC_GRP_INFO_T* grp, NC_TYPE_INFO_T *type);
 int nc4_type_free(NC_TYPE_INFO_T *type);
 int nc4_field_list_add(NC_TYPE_INFO_T* parent, const char *name,
 		       size_t offset, hid_t field_hdf_typeid, hid_t native_typeid,

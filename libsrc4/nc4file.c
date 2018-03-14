@@ -260,6 +260,7 @@ read_hdf5_att(NC_GRP_INFO_T *grp, hid_t attid, NC_ATT_INFO_T *att)
       return NC_EATTMETA;
    if ((att->native_hdf_typeid = H5Tget_native_type(file_typeid, H5T_DIR_DEFAULT)) < 0)
       BAIL(NC_EHDFERR);
+fprintf(stderr,"x0: %s: name=%s native=%ld\n",__func__,att->hdr.name,(long)att->native_hdf_typeid); fflush(stderr);
    if ((att_class = H5Tget_class(att->native_hdf_typeid)) < 0)
       BAIL(NC_EATTMETA);
    if (att_class == H5T_STRING && !H5Tis_variable_str(att->native_hdf_typeid))
@@ -462,16 +463,7 @@ att_read_var_callbk(hid_t loc_id, const char *att_name, const H5A_info_t *ainfo,
       /* Read the rest of the info about the att,
        * including its values. */
       if ((retval = read_hdf5_att(att_info->grp, attid, att)))
-      {
-         if (NC_EBADTYPID == retval)
-         {
-            if ((retval = nc4_att_free(att)))
-               BAIL(retval);
-            att = NULL;
-         }
-         else
-            BAIL(retval);
-      }
+	BAIL(retval);
 
       if (att)
          att->created = NC_TRUE;
@@ -482,9 +474,16 @@ att_read_var_callbk(hid_t loc_id, const char *att_name, const H5A_info_t *ainfo,
    return NC_NOERR;
 
 exit:
-   if (attid > 0 && H5Aclose(attid) < 0)
-      BAIL2(NC_EHDFERR);
-
+     if(retval) {
+        if (retval == NC_EBADTYPID) {
+	    /* NC_EBADTYPID will be normally converted to NC_NOERR so that
+               the parent iterator does not fail. */
+	    retval = nc4_att_list_del(att_info->var->att,att);
+	    att = NULL;
+        }
+      }
+      if (attid > 0 && H5Aclose(attid) < 0)
+	  retval = NC_EHDFERR;
    return retval;
 }
 
@@ -1250,7 +1249,7 @@ exit:
    if (retval < 0 && dimscale_created)
    {
       /* free the dimension */
-      if ((retval = nc4_dim_free(new_dim)))
+      if ((retval = nc4_dim_list_del(grp, new_dim)))
          BAIL2(retval);
 
       /* Reset the group's information */
@@ -1834,6 +1833,7 @@ read_var(NC_GRP_INFO_T *grp, hid_t datasetid, const char *obj_name,
        !strncmp(obj_name, NON_COORD_PREPEND, strlen(NON_COORD_PREPEND)))
    {
       /* Allocate space for the name. */
+      if(finalname) free(finalname); finalname = NULL;
       if (!(finalname = malloc(((strlen(obj_name) - strlen(NON_COORD_PREPEND))+ 1) * sizeof(char))))
          BAIL(NC_ENOMEM);
       strcpy(finalname, &obj_name[strlen(NON_COORD_PREPEND)]);
@@ -2045,8 +2045,9 @@ exit:
    {
       if (incr_id_rc && H5Idec_ref(datasetid) < 0)
          BAIL2(NC_EHDFERR);
-      if (var && nc4_var_del(var))
-         BAIL2(NC_EHDFERR);
+      if (var != NULL) {
+	 nc4_var_list_del(grp,var);
+      }
    }
    if (access_pid && H5Pclose(access_pid) < 0)
       BAIL2(NC_EHDFERR);

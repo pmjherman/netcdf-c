@@ -493,7 +493,7 @@ nc4_open_hdf4_file(const char *path, int mode, NC *nc)
 
 fail:
    if(dimsize) free(dimsize);
-   if(var) nc4_var_del(var);
+   if(var) nc4_var_list_del(grp,var);
    return retval;
 }
 

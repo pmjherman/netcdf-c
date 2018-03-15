@@ -1,5 +1,5 @@
 # Test c output
-T=tst_interops
+T=tst_dims
 
 #SRC=hdf5plugins/H5Zmisc.c
 
@@ -14,7 +14,7 @@ CMD=gdb --args
 
 CFLAGS = -Wall -Wno-unused-variable -Wno-unused-function -g -O0 -I.. -I../include
 
-LDFLAGS = ../liblib/.libs/libnetcdf.a -L/usr/local/lib -lhdf5_hl -lhdf5 -lz -ldl -lcurl -lm
+LDFLAGS = ../liblib/.libs/libnetcdf.a -L/usr/local/lib -lhdf5_hl -lhdf5 -lz -ldl -lcurl -lm -lmfhdf -ldf
 
 ifdef PAR
 CC=mpicc

@@ -877,7 +877,7 @@ nc4_var_list_add(NC_GRP_INFO_T* grp, const char* name, int ndims, NC_VAR_INFO_T 
 
 exit:
    if(retval != NC_NOERR) {
-	nc4_var_del(new_var);
+	nc4_var_list_del(grp,new_var);
    }
    return retval;
 
@@ -1428,7 +1428,7 @@ nc4_type_free(NC_TYPE_INFO_T *type)
  * @author Ed Hartnett
  */
 int
-nc4_var_del(NC_VAR_INFO_T *var)
+nc4_var_list_del(NC_GRP_INFO_T* grp, NC_VAR_INFO_T *var)
 {
    NC_ATT_INFO_T *att;
    int ret = NC_NOERR;
@@ -1436,6 +1436,13 @@ nc4_var_del(NC_VAR_INFO_T *var)
 
    if(var == NULL)
       return NC_NOERR;
+
+   /* Remove from lists */
+   if(grp) {
+       i = ncindexfind(grp->vars,(NC_OBJ*)var);
+       if(i >= 0)
+           ncindexidel(grp->vars,i);
+   }
 
    /* First delete all the attributes attached to this var. */
    for(i=0;i<ncindexsize(var->att);i++) {
@@ -1529,6 +1536,26 @@ nc4_dim_free(NC_DIM_INFO_T *dim)
 }
 
 /**
+ * @internal Free a dim and unlist it
+ *
+ * @param grp Pointer to dim's containing group
+ * @param dim Pointer to dim info struct of type to delete.
+ *
+ * @return ::NC_NOERR No error.
+ * @author Dennis Heimbigner
+ */
+int
+nc4_dim_list_del(NC_GRP_INFO_T* grp, NC_DIM_INFO_T *dim)
+{
+   if(grp && dim) {
+	int pos = ncindexfind(grp->dim,(NC_OBJ*)dim);
+	if(pos >= 0)
+            ncindexidel(grp->dim,pos);
+   }
+   return nc4_dim_free(dim);
+}
+
+/**
  * @internal Recursively delete the data for a group (and everything
  * it contains) in our internal metadata store.
  *
@@ -1588,7 +1615,7 @@ nc4_rec_grp_del(NC_GRP_INFO_T *grp)
        * scale. */
       if (var->hdf_datasetid && H5Dclose(var->hdf_datasetid) < 0)
          return NC_EHDFERR;
-      if ((retval = nc4_var_del(var)))
+      if ((retval = nc4_var_list_del(grp,var)))
          return retval;
    }
    ncindexfree(grp->vars);
@@ -1674,6 +1701,7 @@ nc4_att_free(NC_ATT_INFO_T *att)
    if (att->data)
       free(att->data);
 
+fprintf(stderr,"x1: %s: name=%s native=%ld\n",__func__,att->hdr.name,(long)att->native_hdf_typeid); fflush(stderr);
    /* Free the name. */
    if (att->hdr.name) {
       free(att->hdr.name);

@@ -4082,7 +4082,6 @@ nc4_rec_match_dimscales(NC_GRP_INFO_T *grp)
  *
  * @param h5 Pointer to HDF5 file info struct.
  * @param xtype NetCDF type ID.
- * @param is_long True only if NC_LONG is the memory type.
  * @param len Pointer that gets lenght in bytes.
  *
  * @returns NC_NOERR No error.
@@ -4218,14 +4217,14 @@ exit:
 /**
  * @internal
  *
- * @param log
+ * @param uselog
  * @param id HDF5 ID.
  * @param type
  *
  * @return NC_NOERR No error.
  */
 void
-reportobject(int log, hid_t id, unsigned int type)
+reportobject(int uselog, hid_t id, unsigned int type)
 {
    char name[MAXNAME];
    ssize_t len;
@@ -4249,12 +4248,13 @@ reportobject(int log, hid_t id, unsigned int type)
       break;
    default: typename = "<unknown>"; break;
    }
-   if(log) {
 #ifdef LOGGING
+   if(uselog) {
       LOG((0,"Type = %s(%lld) name='%s'",typename,printid,name));
+   } else
 #endif
-   } else {
-      fprintf(stderr,"Type = %s(%lld) name='%s'",typename,printid,name);
+   {
+      fprintf(stderr,"Type = %s(%lld) name='%s'\n",typename,printid,name);
    }
    
 }
@@ -4262,7 +4262,7 @@ reportobject(int log, hid_t id, unsigned int type)
 /**
  * @internal
  *
- * @param log
+ * @param uselog
  * @param fid HDF5 ID.
  * @param ntypes Number of types.
  * @param otypes Pointer that gets number of open types.
@@ -4270,18 +4270,20 @@ reportobject(int log, hid_t id, unsigned int type)
  * @return ::NC_NOERR No error.
  */
 static void
-reportopenobjectsT(int log, hid_t fid, int ntypes, unsigned int* otypes)
+reportopenobjectsT(int uselog, hid_t fid, int ntypes, unsigned int* otypes)
 {
    int t,i;
    ssize_t ocount;
    size_t maxobjs = -1;
    hid_t* idlist = NULL;
 
-   if(log) {
+   /* Always report somehow */
 #ifdef LOGGING
-      LOG((0,"\nReport: open objects on %lld\n",(long long)fid));
+   if(uselog) {
+      LOG((0,"\nReport: open objects on %lld",(long long)fid));
+   } else
 #endif
-   } else {
+   {
       fprintf(stdout,"\nReport: open objects on %lld\n",(long long)fid);
    }
    maxobjs = H5Fget_obj_count(fid,H5F_OBJ_ALL);
@@ -4292,7 +4294,7 @@ reportopenobjectsT(int log, hid_t fid, int ntypes, unsigned int* otypes)
       ocount = H5Fget_obj_ids(fid,ot,maxobjs,idlist);
       for(i=0;i<ocount;i++) {
          hid_t o = idlist[i];
-         reportobject(log,o,ot);
+         reportobject(uselog,o,ot);
       }
    }
    if(idlist != NULL) free(idlist);
@@ -4301,15 +4303,50 @@ reportopenobjectsT(int log, hid_t fid, int ntypes, unsigned int* otypes)
 /**
  * @internal Report open objects.
  *
- * @param log
+ * @param uselog
  * @param fid HDF5 file ID.
  *
  * @return NC_NOERR No error.
  */
 void
-reportopenobjects(int log, hid_t fid)
+reportopenobjects(int uselog, hid_t fid)
 {
-   reportopenobjectsT(log, fid,5,OTYPES);
+   reportopenobjectsT(uselog, fid ,5, OTYPES);
+}
+
+/**
+ * @internal Report open objects given a pointer to NC_HDF5_FILE_INFO_T object
+ *
+ * @param h5 file object
+ *
+ */
+void
+showopenobjects5(NC_HDF5_FILE_INFO_T* h5)
+{
+    fprintf(stderr,"===== begin showopenobjects =====\n");
+    reportopenobjects(0,h5->hdfid);
+    fprintf(stderr,"===== end showopenobjects =====\n");
+    fflush(stderr);
+}
+
+/**
+ * @internal Report open objects given an ncid
+ * Defined to support user or gdb level call.
+ *
+ * @param ncid file id
+ *
+ */
+void
+showopenobjects(int ncid)
+{
+   NC_HDF5_FILE_INFO_T* h5 = NULL;
+
+   /* Find our metadata for this file. */
+   if (nc4_find_nc_grp_h5(ncid, NULL, NULL, &h5) != NC_NOERR)
+     fprintf(stderr,"failed\n");
+   else
+      showopenobjects5(h5);
+   fflush(stderr);
 }
 
 /**

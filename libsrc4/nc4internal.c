@@ -351,7 +351,7 @@ nc4_find_nc_grp_h5(int ncid, NC **nc, NC_GRP_INFO_T **grpp,
    NC *f = nc4_find_nc_file(ncid,&h5);
 
    if(f == NULL) return NC_EBADID;
-   *nc = f;
+   if(nc) *nc = f;
 
    if (h5) {
       assert(h5->root_grp);
@@ -373,7 +373,7 @@ nc4_find_nc_grp_h5(int ncid, NC **nc, NC_GRP_INFO_T **grpp,
 /**
  * @internal Use NC_HDF5_FILE_INFO_T->allgroups to locate a group id.
  *
- * @param start_grp Pointer to group where search should be started.
+ * @param h5 Pointer to file info
  * @param target_nc_grpid Group ID to be found.
  *
  * @return Pointer to group info struct, or NULL if not found.
@@ -768,7 +768,7 @@ nc4_find_nc_file(int ext_ncid, NC_HDF5_FILE_INFO_T** h5p)
 /**
  * @internal Add NC_OBJ to appropriate indices.
  *
- * @param list index
+ * @param index NCindex into which to insert obj
  * @param obj Pointer to object to add.
  *
  * @author Ed Hartnett, Dennis Heimbigner
@@ -808,7 +808,7 @@ obj_track(NC_HDF5_FILE_INFO_T* file, NC_OBJ* obj)
 /**
  * @internal Remove object from a list
  *
- * @param list List
+ * @param index NCindex from which to delete
  * @param obj Pointer to object to delete.
  *
  * @return ::NC_NOERR No error.
@@ -821,7 +821,12 @@ obj_list_del(NCindex* index, NC_OBJ *obj)
 }
 
 /**
- * @internal Return a pointer to the new var.
+ * @internal Create a new variable and insert int relevant lists
+ *
+ * @param grp the containing group
+ * @param name the name for the new variable
+ * @param ndims the rank of the new variable
+ * @param var Pointer in which to return a pointer to the new var.
  *
  * @param var Pointer to pointer that gets variable info struct.
  *
@@ -939,7 +944,8 @@ exit:
 /**
  * @internal Add to the end of an att list.
  *
- * @param list List of att info structs.
+ * @param list NCindex of att info structs.
+ * @param name name of the new attribute
  * @param att Pointer to pointer that gets the new att info struct.
  *
  * @return ::NC_NOERR No error.
@@ -983,10 +989,7 @@ exit:
  * @internal Add to the end of a group list. Can't use 0 as a
  * new_nc_grpid - it's reserverd for the root group.
  *
- * @param list List
- * @param new_nc_grpid New group ID.
- * @param parent_grp The parent group.
- * @param nc Pointer to the file's NC struct.
+ * @param parent The parent group.
  * @param name Name of the group.
  * @param grp Pointer to pointer that gets new group info struct.
  *
@@ -1043,7 +1046,6 @@ nc4_grp_list_add(NC_GRP_INFO_T * parent, char *name, NC_GRP_INFO_T **grp)
  * @internal Build the root group with id 0.
  *
  * @param h5 root file
- * @param grp Pointer to pointer that gets new group info struct.
  *
  * @return ::NC_NOERR No error.
  * @author Ed Hartnett
@@ -1137,8 +1139,9 @@ nc4_check_dup_name(NC_GRP_INFO_T *grp, char *name)
  * @param grp Pointer to group info struct.
  * @param size Size of type in bytes.
  * @param name Name of type.
+ * @param assignedid if >= 0 then override the default type id
  * @param type Pointer that gets pointer to new type info
- * struct. Ignored if NULL.
+ *             struct. Ignored if NULL.
  *
  * @return ::NC_NOERR No error.
  * @return ::NC_ENOMEM Out of memory.
@@ -1211,7 +1214,7 @@ nc4_type_list_add(NC_GRP_INFO_T *grp, size_t size, const char *name,
 /**
  * @internal Add to the end of a compound field list.
  *
- * @param list Pointer to pointer of list of field info structs.
+ * @param parent parent type
  * @param name Name of the field.
  * @param offset Offset in bytes.
  * @param field_hdf_typeid The HDF5 type ID of the field.
@@ -1274,7 +1277,7 @@ nc4_field_list_add(NC_TYPE_INFO_T *parent, const char *name,
 /**
  * @internal Add a member to an enum type.
  *
- * @param list Pointer to pointer of list of enum member info structs.
+ * @param parent Containing NC_TYPE_INFO_T object
  * @param size Size in bytes of new member.
  * @param name Name of the member.
  * @param value Value to associate with member.
@@ -1318,7 +1321,6 @@ nc4_enum_member_add(NC_TYPE_INFO_T *parent, size_t size,
 /**
  * @internal Free up a field
  *
- * @param list Pointer to pointer of list of field info structs.
  * @param field Pointer to field info of field to delete.
  *
  * @return ::NC_NOERR No error.
@@ -1428,7 +1430,7 @@ nc4_type_free(NC_TYPE_INFO_T *type)
  * @author Ed Hartnett
  */
 int
-nc4_var_list_del(NC_GRP_INFO_T* grp, NC_VAR_INFO_T *var)
+nc4_var_free(NC_VAR_INFO_T *var)
 {
    NC_ATT_INFO_T *att;
    int ret = NC_NOERR;
@@ -1436,13 +1438,6 @@ nc4_var_list_del(NC_GRP_INFO_T* grp, NC_VAR_INFO_T *var)
 
    if(var == NULL)
       return NC_NOERR;
-
-   /* Remove from lists */
-   if(grp) {
-       i = ncindexfind(grp->vars,(NC_OBJ*)var);
-       if(i >= 0)
-           ncindexidel(grp->vars,i);
-   }
 
    /* First delete all the attributes attached to this var. */
    for(i=0;i<ncindexsize(var->att);i++) {
@@ -1517,6 +1512,32 @@ nc4_var_list_del(NC_GRP_INFO_T* grp, NC_VAR_INFO_T *var)
 }
 
 /**
+ * @internal  Delete a var, and free the memory.
+ *
+ * @param grp the containing group
+ * @param var Pointer to the var info struct of var to delete.
+ *
+ * @return ::NC_NOERR No error.
+ * @author Ed Hartnett
+ */
+int
+nc4_var_list_del(NC_GRP_INFO_T* grp, NC_VAR_INFO_T *var)
+{
+   int i;
+
+   if(var == NULL)
+      return NC_NOERR;
+
+   /* Remove from lists */
+   if(grp) {
+       i = ncindexfind(grp->vars,(NC_OBJ*)var);
+       if(i >= 0)
+           ncindexidel(grp->vars,i);
+   }
+   return nc4_var_free(var);
+}
+
+/**
  * @internal Free a dim 
  *
  * @param dim Pointer to dim info struct of type to delete.
@@ -1559,7 +1580,6 @@ nc4_dim_list_del(NC_GRP_INFO_T* grp, NC_DIM_INFO_T *dim)
  * @internal Recursively delete the data for a group (and everything
  * it contains) in our internal metadata store.
  *
- * @param list Pointer to pointer of list.
  * @param grp Pointer to group info struct.
  *
  * @return ::NC_NOERR No error.
@@ -1600,7 +1620,7 @@ nc4_rec_grp_del(NC_GRP_INFO_T *grp)
 	att = (NC_ATT_INFO_T*)ncindexith(grp->att,i);
 	if(att == NULL) continue;
         LOG((4, "%s: deleting att %s", __func__, att->hdr.name));
-        if ((retval = nc4_att_free(att)))
+        if ((retval = nc4_att_free(att)))  /* free but leave in parent list */
          return retval;
    }
    ncindexfree(grp->att);
@@ -1615,7 +1635,7 @@ nc4_rec_grp_del(NC_GRP_INFO_T *grp)
        * scale. */
       if (var->hdf_datasetid && H5Dclose(var->hdf_datasetid) < 0)
          return NC_EHDFERR;
-      if ((retval = nc4_var_list_del(grp,var)))
+      if ((retval = nc4_var_free(var)))  /* free but leave in parent list */
          return retval;
    }
    ncindexfree(grp->vars);
@@ -1631,7 +1651,7 @@ nc4_rec_grp_del(NC_GRP_INFO_T *grp)
        * dim. */
       if (dim->hdf_dimscaleid && H5Dclose(dim->hdf_dimscaleid) < 0)
          return NC_EHDFERR;
-      if ((retval = nc4_dim_free(dim)))
+      if ((retval = nc4_dim_free(dim))) /* free but leave in parent list */
          return retval;
    }
    ncindexfree(grp->dim);
@@ -1644,7 +1664,7 @@ nc4_rec_grp_del(NC_GRP_INFO_T *grp)
       NC_TYPE_INFO_T* type = (NC_TYPE_INFO_T*)ncindexith(grp->type,i);
       if(type == NULL) continue;
       LOG((4, "%s: deleting type %s", __func__, type->hdr.name));
-      if ((retval = nc4_type_free(type)))
+      if ((retval = nc4_type_free(type))) /* free but leave in parent list */
          return retval;
    }
    ncindexfree(grp->type);
@@ -1701,7 +1721,6 @@ nc4_att_free(NC_ATT_INFO_T *att)
    if (att->data)
       free(att->data);
 
-fprintf(stderr,"x1: %s: name=%s native=%ld\n",__func__,att->hdr.name,(long)att->native_hdf_typeid); fflush(stderr);
    /* Free the name. */
    if (att->hdr.name) {
       free(att->hdr.name);
@@ -1814,6 +1833,7 @@ nc4_break_coord_var(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *coord_var, NC_DIM_INFO_T 
  *
  * @param grp The grp of the dimscale-only dataset to be deleted, or a
  * higher group in the heirarchy (ex. root group).
+ * @param dimid id of the dimension
  * @param dim Pointer to the dim with the dimscale-only dataset to be
  * deleted.
  *

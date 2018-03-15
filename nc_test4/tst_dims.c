@@ -41,7 +41,6 @@
 int
 main(int argc, char **argv)
 {
-#if 0
    printf("\n*** Testing netcdf-4 dimensions.\n");
    printf("*** Testing that netcdf-4 dimids inq works on netcdf-3 file...");
    {
@@ -64,6 +63,7 @@ main(int argc, char **argv)
       if (ndims_in != 0) ERR;
       if (nc_close(ncid)) ERR;
    }
+
    SUMMARIZE_ERR;
    printf("*** Testing that netcdf-4 dimids inq works on more complex netcdf-3 file...");
    {
@@ -736,7 +736,6 @@ main(int argc, char **argv)
 
       if (nc_close(ncid)) ERR;
    }
-#endif
 
    SUMMARIZE_ERR;
    printf("*** Testing adding a coordinate var to file with unlimited dimension...");
@@ -831,6 +830,7 @@ main(int argc, char **argv)
 
       if (nc_close(ncid)) ERR;
    }
+
    SUMMARIZE_ERR;
    printf("*** Creating file with 1 data var, 2 dims, and 2 coord. vars...");
 
@@ -959,7 +959,7 @@ main(int argc, char **argv)
 
       if (nc_close(ncid)) ERR;
    }
-exit(0);
+
    SUMMARIZE_ERR;
    printf("*** Creating file with 3 data vars, 4 dims, and 2 coord. vars...");
 

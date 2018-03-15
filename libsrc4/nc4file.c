@@ -260,7 +260,6 @@ read_hdf5_att(NC_GRP_INFO_T *grp, hid_t attid, NC_ATT_INFO_T *att)
       return NC_EATTMETA;
    if ((att->native_hdf_typeid = H5Tget_native_type(file_typeid, H5T_DIR_DEFAULT)) < 0)
       BAIL(NC_EHDFERR);
-fprintf(stderr,"x0: %s: name=%s native=%ld\n",__func__,att->hdr.name,(long)att->native_hdf_typeid); fflush(stderr);
    if ((att_class = H5Tget_class(att->native_hdf_typeid)) < 0)
       BAIL(NC_EATTMETA);
    if (att_class == H5T_STRING && !H5Tis_variable_str(att->native_hdf_typeid))
@@ -521,6 +520,7 @@ typedef struct NC4_rec_read_metadata_ud
 /* Forward */
 static int NC4_enddef(int ncid);
 static int nc4_rec_read_metadata(NC_GRP_INFO_T *grp);
+static void dumpopenobjects(NC_HDF5_FILE_INFO_T* h5);
 
 /**
  * @internal This function will write all changed metadata, and
@@ -633,30 +633,7 @@ close_netcdf4_file(NC_HDF5_FILE_INFO_T *h5, int abort)
    
    if (H5Fclose(h5->hdfid) < 0)
    {
-      int nobjs;
-      
-      nobjs = H5Fget_obj_count(h5->hdfid, H5F_OBJ_ALL);
-      /* Apparently we can get an error even when nobjs == 0 */
-      if(nobjs < 0) {
-         BAIL_QUIET(NC_EHDFERR);
-      } else if(nobjs > 0) {
-#ifdef LOGGING
-         char msg[1024];
-         int logit = 1;
-         /* If the close doesn't work, probably there are still some HDF5
-          * objects open, which means there's a bug in the library. So
-          * print out some info on to help the poor programmer figure it
-          * out. */
-         snprintf(msg,sizeof(msg),"There are %d HDF5 objects open!", nobjs);
-#ifdef LOGOPEN
-         LOG((0, msg));
-#else
-         fprintf(stdout,msg);
-         logit = 0;
-#endif
-         reportopenobjects(logit,h5->hdfid);
-#endif
-      }
+      dumpopenobjects(h5);
    }
 exit:
    /* Free the nc4_info struct; above code should have reclaimed
@@ -664,6 +641,39 @@ exit:
    if(!retval && h5 != NULL)
       free(h5);
    return retval;
+}
+
+static void
+dumpopenobjects(NC_HDF5_FILE_INFO_T* h5)
+{
+      int nobjs;
+      
+      nobjs = H5Fget_obj_count(h5->hdfid, H5F_OBJ_ALL);
+      /* Apparently we can get an error even when nobjs == 0 */
+      if(nobjs < 0) {
+	 return;
+      } else if(nobjs > 0) {
+         char msg[1024];
+         int logit = 0;
+         /* If the close doesn't work, probably there are still some HDF5
+          * objects open, which means there's a bug in the library. So
+          * print out some info on to help the poor programmer figure it
+          * out. */
+         snprintf(msg,sizeof(msg),"There are %d HDF5 objects open!", nobjs);
+#ifdef LOGGING
+#ifdef LOGOPEN
+         LOG((0, msg));
+	 logit = 1;
+#endif
+#else
+         fprintf(stdout,"%s\n",msg);
+         logit = 0;
+#endif
+         reportopenobjects(logit,h5->hdfid);
+	 fflush(stderr);
+      }
+
+    return;
 }
 
 #ifdef NC4NOTUSED
@@ -1833,7 +1843,7 @@ read_var(NC_GRP_INFO_T *grp, hid_t datasetid, const char *obj_name,
        !strncmp(obj_name, NON_COORD_PREPEND, strlen(NON_COORD_PREPEND)))
    {
       /* Allocate space for the name. */
-      if(finalname) free(finalname); finalname = NULL;
+      if(finalname) {free(finalname); finalname = NULL;}
       if (!(finalname = malloc(((strlen(obj_name) - strlen(NON_COORD_PREPEND))+ 1) * sizeof(char))))
          BAIL(NC_ENOMEM);
       strcpy(finalname, &obj_name[strlen(NON_COORD_PREPEND)]);
@@ -2195,8 +2205,7 @@ exit:
 /**
  * @internal Add callback function to list.
  *
- * @param head
- * @param tail
+ * @param udata - the callback state
  * @param oinfo The object info.
  *
  * @return ::NC_NOERR No error.

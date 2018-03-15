@@ -32,7 +32,6 @@ int nc4typelen(nc_type type);
  * @param mem_type Type of attribute data in memory.
  * @param lenp Pointer that gets length of attribute array.
  * @param attnump Pointer that gets the attribute number.
- * @param is_long True if attribute data is of type NC_LONG.
  * @param data Attribute data.
  *
  * @return ::NC_NOERR No error.
@@ -367,6 +366,7 @@ NC4_inq_attname(int ncid, int varid, int attnum, char *name)
  *
  * @param grp Group
  * @param varid Variable ID | NC_BLOGAL
+ * @param varp Pointer into which to return created NC_VAR_INFO_T instance
  *
  * @return Attribute list | NULL
  * @author Dennis Heimbigner
@@ -606,7 +606,7 @@ exit:
  * @param file_type Type of the attribute data in file.
  * @param len Number of elements in attribute array.
  * @param data Attribute data.
- * @param memtype Type of data in memory.
+ * @param mem_type Type of data in memory.
  *
  * @return ::NC_NOERR No error.
  * @return ::NC_EINVAL Invalid parameters.

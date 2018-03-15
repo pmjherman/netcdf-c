@@ -31,6 +31,7 @@ SUBDIRS = hdf5plugins
 if ENABLE_FILTER_TESTING
 # filter_example.c should be same as nc_test4/test_filter.c
 check_PROGRAMS += filter_example
+TESTS += run_filter.sh
 endif
 
 endif #USE_NETCDF4

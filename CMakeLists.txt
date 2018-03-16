@@ -1902,7 +1902,7 @@ configure_file(${CMAKE_SOURCE_DIR}/nc_test4/findplugin.in ${CMAKE_BINARY_DIR}/nc
 
 IF(ENABLE_FILTER_TESTING)
 IF(ENABLE_EXAMPLES)
-configure_file(${CMAKE_SOURCE_DIR}/examples/C/findplugin.in ${CMAKE_BINARY_DIR}/examples/C/findplugin.sh @ONLY NEWLINE_STYLE LF)
+configure_file(${CMAKE_SOURCE_DIR}/nc_test4/findplugin.in ${CMAKE_BINARY_DIR}/examples/C/findplugin.sh @ONLY NEWLINE_STYLE LF)
 ENDIF()
 ENDIF()
 

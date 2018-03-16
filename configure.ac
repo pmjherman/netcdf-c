@@ -976,12 +976,10 @@ if test "x$enable_netcdf_4" = xyes; then
       if test "x$nc_mfhdf_h_missing" = xyes; then
          AC_MSG_ERROR([Cannot find mfhdf.h, yet --enable-hdf4 was used.])
       fi
-if test x = y ; then
       AC_CHECK_LIB([df], [Hclose], [], [AC_MSG_ERROR([Can't find or link to the hdf4 df library. See config.log for errors.])])
       AC_CHECK_LIB([mfhdf], [SDcreate], [], [AC_MSG_ERROR([Can't find or link to the hdf4 mfhdf library. See config.log for errors.])])
 
      AC_CHECK_LIB([jpeg], [jpeg_set_quality], [], [AC_MSG_ERROR([Can't find or link to the jpeg library (required by hdf4). See config.log for errors.])])
-fi
       AC_DEFINE([USE_HDF4], [1], [if true, use HDF4 too])
    fi
 fi

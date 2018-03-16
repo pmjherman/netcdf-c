@@ -1769,9 +1769,10 @@ IF(ENABLE_EXAMPLES)
 MESSAGE(STATUS "copying filter plugin building files")
 FILE(COPY ${netCDF_SOURCE_DIR}/nc_test4/findplugin.sh
      DESTINATION ${netCDF_BINARY_DIR}/nc_test4/)
-FILE(COPY ${netCDF_SOURCE_DIR}/nc_test4/hdf5plugins/
-     DESTINATION ${netCDF_BINARY_DIR}/nc_test4/hdf5plugins/
-     FILES_MATCHING "*.[ch]")
+FILE(GLOB PLUGINFILES ${netCDF_SOURCE_DIR}/nc_test4/hdf5plugins/*.c
+		      ${netCDF_SOURCE_DIR}/nc_test4/hdf5plugins/*.h)
+FILE(COPY ${PLUGINFILES}
+     DESTINATION ${netCDF_BINARY_DIR}/nc_test4/hdf5plugins/)
 ENDIF()
 ENDIF()
 

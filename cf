@@ -124,7 +124,8 @@ FLAGS="$FLAGS --disable-parallel4"
 fi
 
 if test "x${DB}" = x1 ; then
-FLAGS="$FLAGS --disable-shared --enable-static"
+#FLAGS="$FLAGS --disable-shared --enable-static"
+FLAGS="$FLAGS --enable-static"
 else
 FLAGS="$FLAGS --enable-shared"
 fi

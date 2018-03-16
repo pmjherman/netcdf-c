@@ -23,6 +23,6 @@ libbzip2_la_SOURCES = ${HDF5PLUGINSRC}
 libbzip2_la_LDFLAGS = -module -avoid-version -shared -export-dynamic -no-undefined
 
 libmisc_la_SOURCES = H5Zmisc.c h5misc.h
-libmisc_la_LDFLAGS = -module -avoid-version -shared -export-dynamic -no-undefined
+libmisc_la_LDFLAGS = -module -avoid-version -shared -export-dynamic -no-undefined -rpath ${abs_builddir}
 
 endif #ENABLE_FILTER_TESTING

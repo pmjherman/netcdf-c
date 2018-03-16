@@ -1098,7 +1098,7 @@ IF (ENABLE_PARALLEL_TESTS AND NOT USE_PARALLEL)
 ENDIF()
 
 # Enable special filter test; experimental when using cmake.
-OPTION(ENABLE_FILTER_TESTING "Enable filter testing. Ignored if shared libraries or netCDF4 are not enabled" ON)
+OPTION(ENABLE_FILTER_TESTING "Enable filter testing. Ignored if shared libraries or netCDF4 are not enabled" OFF)
 IF(NOT ENABLE_NETCDF4)
   MESSAGE(WARNING "ENABLE_FILTER_TESTING requires netCDF-4. Disabling.")
   SET(ENABLE_FILTER_TESTING OFF CACHE BOOL "")

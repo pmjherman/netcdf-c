@@ -1771,7 +1771,7 @@ FILE(COPY ${netCDF_SOURCE_DIR}/nc_test4/findplugin.sh
      DESTINATION ${netCDF_BINARY_DIR}/nc_test4/)
 FILE(COPY ${netCDF_SOURCE_DIR}/nc_test4/hdf5plugins/
      DESTINATION ${netCDF_BINARY_DIR}/nc_test4/hdf5plugins/
-     FILES_MATCHING EXCLUDE Makefile.am CMakeLists.txt)
+     FILES_MATCHING "*.[ch]")
 ENDIF()
 ENDIF()
 

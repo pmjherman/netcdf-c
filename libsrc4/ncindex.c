@@ -14,7 +14,8 @@ Warning: This code depends critically on the assumption that
 */
 
 /* Define this for debug so that table sizes are small */
-#define SMALLTABLE
+#undef SMALLTABLE
+#undef NCNOHASH
 
 #include "config.h"
 #include <stdlib.h>
@@ -28,8 +29,12 @@ Warning: This code depends critically on the assumption that
 #include "nc4internal.h"
 #include "ncindex.h"
 
+#ifdef SMALLTABLE
 /* Keep the table sizes small initially */
 #define DFALTTABLESIZE 7
+#else
+#define DFALTTABLESIZE 37
+#endif
 
 /* Hack to access internal state of a hashmap. Use with care */
 /* Convert an entry from ACTIVE to DELETED;
@@ -340,7 +345,7 @@ next2:
     }
 
 done:
-#endif /*NCIUSEHASH*/
+#endif /*NCNOHASH*/
     fflush(stderr);
     return (nerrs > 0 ? 0: 1);
 }

@@ -8,7 +8,7 @@
 
 The original internal representations of metadata in memory
 relied on linear searching of lists to locate various objects
-by name or by numeric id \(e.g. "varid" or "grpid"\).
+by name or by numeric id: e.g. _varid_ or _grpid_.
 
 In recent years, the flaws in that approach have become obvious
 as users create files with extremely large numbers of objects:
@@ -21,7 +21,7 @@ and netcdf-4 (libsrc4) by adding name hashing tables.
 However, and especially for netcdf-4, linear search still prevailed.
 
 A pervasive change has been made to try to change searches by name
-or by id from O(n) to o(1).
+or by id from O(n) to O(1).
 This uses hashing for name-based search
 and vectors for numeric id-based search.
 All other cases were left as O(n) searches.
@@ -151,14 +151,17 @@ a copy of the actual key. The key and keysize fields are used for this.
 \subsection Sncindex NCindex
 
 An "index" \(aka instance of type "NCindex"\) is a combination
-of one NClist instance plus one NC_hashmap instance.  An index
-is used to provide several kinds of lookup with respect to a
-specific list of metadata objects. For example, the subgroups of
-a group are stored using a vector of pointers to the subgroup
-objects.  This also provides information about creation order,
-which is sometimes important.  However, we often need fast
-access to that vector by name so an NCindex object provides these
-capabilities. The NCindex object contains:
+of one NClist instance plus one NC_hashmap instance.
+The hashmap maps a name to the position of the correspondingly
+named object in the NClist part of the NCindex.
+
+An index is used to provide several kinds of lookup with respect
+to a specific list of metadata objects. For example, the
+subgroups of a group are stored using a vector of pointers to
+the subgroup objects.  This also provides information about
+creation order, which is sometimes important.  However, we often
+need fast access to that vector by name so an NCindex object
+provides these capabilities. The NCindex object contains:
 
 1. A vector into which the object pointers can be stored
    and iterated over.
@@ -231,18 +234,127 @@ for the object. The hashkey is the same hash value as used in nchashtable.c.
 
 \section Scliches Programming cliches
 
+\subsection Slookupname Lookup an Object by Name
+
+In the original code, the following _cliche_ (code snippet)
+was common for looking up an object by name.
+\code
+NC_GRP_INFO_T* grp = ...;
+...
+NC_GRP_INFO_T* g;
+...
+for (g = grp->children; g; g = g->l.next) {
+    if(strcmp(name,g->name)==0) {
+      ... code to process matching grp by name
+    }
+...
+}
+\endcode
+In this case, this loop is iterating across all the subgroups (children)
+of the grp. It does so by walking the linked list of child groups.
+It does a name comparison in order to find the group with the desired name.
+
+In the new code, this iteration cliche is replaced by something
+that will look like this.
+\code
+NC_GRP_INFO_T* grp = ...;
+NC_GRP_INFO_T* g;
+...
+g = ncindexlookup(grp->children,name);
+if(g != NULL)
+      ... code to process matching grp by name
+}
+\endcode
+In this case, the iteration uses a hashtable.
+
+\subsection Slookupid Lookup an Object by id
+
+In the original code, the following _cliche_ (code snippet)
+was common for looking up an object by its id (dimid, varid, etc).
+\code
+NC_GRP_INFO_T* grp = ...;
+...
+NC_DIM_INFO_T* d;
+...
+for (d = grp->dim; d; d = d->l.next) {
+    if(varid == d->dimid)
+      ... code to process matching dim by index
+    }
+...
+}
+\endcode
+In this case, this loop is iterating across all the dimension objects
+of the grp. It does so by walking the linked list of dimensions.
+It does an id comparison in order to find the group with the desired
+dimension.
+
+In the new code, this iteration cliche is replaced by something
+that will look like this.
+\code
+NC_HDF5_FILE_INFO_T* h5 = ...;
+NC_DIM_INFO_T* d;;
+...
+d = nclistget(h5->alldims,id);
+if(d != NULL)
+      ... code to process matching dim by id
+}
+\endcode
+This shows how the alldims vector is used to map from a
+dimid directly to the matching dimension object.
+In this example, h5 is the NC_HDF5_FILE_INFO_T file object.
+This approach works for dimension ids, group ids, and type ids
+because they are globally unique.
+
+For variables and attributes, we have to use the containing group's
+NCindex, such as grp->vars. In this case, the varid, is mapped using
+code like this.
+\code
+NC_GRP_INFO_T* grp = ...;
+NC_VAR_INFO_T* v;
+...
+v = ncindexith(grp->vars,id);
+if(v != NULL)
+      ... code to process matching variable by id
+}
+\endcode
+
+\subsection Siterate Iterating over sets of objects
+
 In the original code, the following _cliche_ (code snippet)
 was common.
+\code
+NC_GRP_INFO_T* grp;
+...
+NC_GRP_INFO_T* g;
+...
+for (g = grp->children; g; g = g->l.next)
+...
+\endcode
+In this case, this loop is iterating across all the subgroups (children)
+of the grp. It does so by walking the linked list of child groups.
+Similar loops are used to walk a list of dimensions, variables, types,
+or attributes.
 
+In the new code, this iteration cliche is replaced by something
+that will look like this.
+\code
+NC_GRP_INFO_T* grp;
+...
+for(i=0;i<ncindexsize(grp->children);i++) {
+  NC_GRP_INFO_T* g = nclistith(grp->children,i);
+...
+}
+\endcode
+In this case, the iteration is by index into the underlying vector.
 
 \section Snotes_and_warnings Notes and Warning
 
 1. NCindex is currently not used for enum constants and compound fields.
-Additionally, it is not used for listing the dimensions associated
-with a variable.
+   Additionally, it is not used for listing the dimensions associated
+   with a variable.
 2. References between meta-data objects (e.g. group parent or
-containing group) are stored directly and not using any kind
-of vector or hashtable.
+   containing group) are stored directly and not using any kind
+   of vector or hashtable.
 3. Attribute deletion is still a costly operation because it causes
    the whole attribute index to be rebuilt.
 4. Renaming is still a costly operation because it causes
@@ -251,11 +363,20 @@ of vector or hashtable.
    explicitly using counters within the NC_HDF5_FILE_INFO_T object.
    When stored into, for example, "alldims", the position of the
    object is forcibly made to match the value of the assigned id.
+6. The file nchashmap.c has a constant, SMALLTABLE, that controls
+   the size of the default hash table. Setting this constant
+   may be useful in debugging by reducing the default table size.
+7. The file ncindex.c has a constant, SMALLTABLE, that controls
+   the size of the default hash table. Setting this constant
+   may be useful in debugging by reducing the default table size.
+8. The file ncindex.c has a constant, NCNOHASH, that controls
+   if the index uses that hash table versus just searching the
+   index's vector. This is for experimental purposes.
 
-\section Sprovenance Provenance
+\section Sprovenance Contact Information
 
 __Author__: Dennis Heimbigner<br>
 __Initial Version__: 01/10/2018<br>
-__Last Revised__: 02/24/2018
+__Last Revised__: 03/15/2018
 
 */
